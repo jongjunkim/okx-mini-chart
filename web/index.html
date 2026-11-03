@@ -6,7 +6,7 @@
 <title>OKX 차트</title>
 <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <style>
-:root{--bg:#0f1115;--panel:#161a21;--line:#232831;--text:#d6dae1;--muted:#7d8592;--up:#f04452;--down:#3182f6}
+:root{--bg:#0f1115;--panel:#161a21;--line:#232831;--text:#d6dae1;--muted:#7d8592;--up:#f04452;--down:#3182f6;--draw:#e0b341}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:12px -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif}
 body{display:flex;flex-direction:column}
@@ -26,14 +26,33 @@ header{position:relative;display:flex;align-items:center;gap:8px;padding:6px 8px
 #chg{font-variant-numeric:tabular-nums}
 #dot{width:7px;height:7px;border-radius:50%;background:#555;margin-left:auto;flex:none}
 #dot.on{background:#2fbf71}
-nav{display:flex;gap:3px;padding:4px 8px}
-nav button{flex:1;background:var(--panel);border:1px solid var(--line);color:var(--muted);padding:3px 0;border-radius:4px;font:inherit;cursor:pointer}
+nav{position:relative;display:flex;gap:3px;padding:4px 8px}
+nav button{flex:1;background:var(--panel);border:1px solid var(--line);color:var(--muted);padding:3px 0;border-radius:4px;font:inherit;cursor:pointer;white-space:nowrap}
 nav button.active{color:var(--text);border-color:#4a5262}
+nav button.tool{flex:none;padding:3px 7px}
+nav button.tool.active{color:var(--draw);border-color:var(--draw)}
+nav .sep{flex:none;width:5px}
+#hint{display:none;padding:0 8px 4px;color:var(--draw);font-size:11px}
+body.drawing #hint{display:block}
+body.drawing .c *{cursor:crosshair!important}
+#indp{position:absolute;right:8px;top:100%;margin-top:2px;width:236px;background:var(--panel);border:1px solid #3a414d;border-radius:6px;padding:6px 8px;z-index:30;display:none;box-shadow:0 8px 24px #0009}
+#indp.open{display:block}
+#indp .row{display:flex;align-items:center;gap:6px;padding:3px 0}
+#indp label{display:flex;align-items:center;gap:4px;cursor:pointer}
+#indp .sw{display:inline-block;width:12px;height:3px;border-radius:2px}
+#indp select,#indp input[type=number]{background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;font:inherit;padding:2px 4px}
+#indp select,#indp .nm{width:62px}
+#indp input[type=number]{width:52px}
+#indp .foot{border-top:1px solid var(--line);margin-top:4px;padding-top:6px}
+#indp button{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;font:inherit;padding:4px;cursor:pointer}
+#indp button:disabled{color:var(--muted);cursor:default}
 main{flex:1;display:flex;flex-direction:column;min-height:0}
 .pane{position:relative;flex:1;min-height:0;border-top:1px solid var(--line)}
 .pane.hidden{display:none}
 .lbl{position:absolute;left:6px;top:4px;z-index:3;color:var(--muted);pointer-events:none;font-variant-numeric:tabular-nums;white-space:nowrap}
 .lbl b{color:var(--text);font-weight:600;margin-right:6px}
+.lbl .ind{font-size:10px;margin-top:1px}
+.lbl .ind span{margin-right:8px}
 .c{position:absolute;inset:0}
 </style>
 </head>
@@ -45,29 +64,44 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 </header>
 <nav>
   <button data-v="1m">1m</button><button data-v="5m">5m</button><button data-v="15m">15m</button><button data-v="1h">1h</button><button data-v="4h">4h</button><button data-v="1d">1d</button>
+  <span class="sep"></span>
+  <button class="tool" data-mode="h" title="수평선(지지·저항): 누른 뒤 차트를 클릭">수평</button><button class="tool" data-mode="t" title="추세선: 누른 뒤 차트에서 두 점을 클릭">추세</button><button class="tool" data-mode="x" title="지우기: 누른 뒤 지울 선을 클릭">지움</button><button class="tool" id="indBtn" title="이동평균·볼린저밴드">지표</button>
+  <div id="indp"></div>
 </nav>
+<div id="hint"></div>
 <main id="main"></main>
 <script>
 const OKX_BAR = { "1m": "1m", "5m": "5m", "15m": "15m", "1h": "1H", "4h": "4H", "1d": "1Dutc" };
+const SEC = { "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 14400, "1d": 86400 };
 const BARS = Object.keys(OKX_BAR);
 const BAR_OF = Object.fromEntries(BARS.map(b => [OKX_BAR[b], b]));
 const API = "https://www.okx.com/api/v5";
 const TZ = -new Date().getTimezoneOffset() * 60;
 const css = getComputedStyle(document.documentElement);
 const C = k => css.getPropertyValue(k).trim();
+const MA_COLORS = ["#f5c542", "#c77dff", "#2ec4b6", "#ff8c42"];
+const BB_COLOR = "#8a94a6";
 const store = {
   get(k, d) { try { return localStorage.getItem(k) || d } catch (e) { return d } },
   set(k, v) { try { localStorage.setItem(k, v) } catch (e) {} }
 };
+const $ = id => document.getElementById(id);
 
 let inst = store.get("okx.inst", "BTC-USDT");
 let shown = (() => {
   try { const v = JSON.parse(store.get("okx.shown", "")).filter(b => BARS.includes(b)); if (v.length) return v } catch (e) {}
   return ["1m", "5m", "15m"];
 })();
+let ind = (() => {
+  try { const v = JSON.parse(store.get("okx.ind", "")); if (v && v.ma && v.bb) return v } catch (e) {}
+  return {
+    ma: [{ on: false, type: "SMA", n: 5 }, { on: true, type: "SMA", n: 20 }, { on: true, type: "SMA", n: 60 }, { on: false, type: "SMA", n: 120 }],
+    bb: { on: false, n: 20, k: 2 }
+  };
+})();
+let drawings = [], mode = null, pending = null, preview = null;
 let ws, pingT, retryT, tickT, gen = 0, pricePrec = 2;
 const panes = {};
-const $ = id => document.getElementById(id);
 
 const isDeriv = () => /-SWAP$|-\d{6}$/.test(inst);
 const volIdx = () => isDeriv() ? 6 : 5;
@@ -81,6 +115,119 @@ function toBar(r) {
     { time: t, value: +r[volIdx()], color: (c >= o ? C("--up") : C("--down")) + "80" }
   ];
 }
+
+function sma(cl, n) {
+  const out = new Array(cl.length).fill(null);
+  let s = 0;
+  for (let i = 0; i < cl.length; i++) {
+    s += cl[i];
+    if (i >= n) s -= cl[i - n];
+    if (i >= n - 1) out[i] = s / n;
+  }
+  return out;
+}
+
+function ema(cl, n) {
+  const out = new Array(cl.length).fill(null), k = 2 / (n + 1);
+  let e = null;
+  for (let i = n - 1; i < cl.length; i++) {
+    if (i === n - 1) { e = 0; for (let j = 0; j < n; j++) e += cl[j]; e /= n }
+    else e = cl[i] * k + e * (1 - k);
+    out[i] = e;
+  }
+  return out;
+}
+
+function bollinger(cl, n, k) {
+  const mid = sma(cl, n), up = [], lo = [];
+  for (let i = 0; i < cl.length; i++) {
+    if (mid[i] == null) { up.push(null); lo.push(null); continue }
+    let v = 0;
+    for (let j = i - n + 1; j <= i; j++) v += (cl[j] - mid[i]) ** 2;
+    const sd = Math.sqrt(v / n);
+    up.push(mid[i] + k * sd); lo.push(mid[i] - k * sd);
+  }
+  return [up, mid, lo];
+}
+
+function idxOfTime(bars, t) {
+  let lo = 0, hi = bars.length - 1;
+  while (lo <= hi) {
+    const m = (lo + hi) >> 1;
+    if (bars[m].time === t) return m;
+    if (bars[m].time < t) lo = m + 1; else hi = m - 1;
+  }
+  return -1;
+}
+
+function timeToX(P, b, t) {
+  const bars = P.bars, n = bars.length;
+  if (!n) return null;
+  let lg;
+  if (t <= bars[0].time) lg = (t - bars[0].time) / SEC[b];
+  else if (t >= bars[n - 1].time) lg = n - 1 + (t - bars[n - 1].time) / SEC[b];
+  else {
+    let lo = 0, hi = n - 1;
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (bars[m].time <= t) lo = m; else hi = m }
+    lg = lo + (t - bars[lo].time) / (bars[hi].time - bars[lo].time);
+  }
+  return P.chart.timeScale().logicalToCoordinate(lg);
+}
+
+function pointToTP(P, b, pt) {
+  const lg = P.chart.timeScale().coordinateToLogical(pt.x), p = P.candle.coordinateToPrice(pt.y), n = P.bars.length;
+  if (lg == null || p == null || !n) return null;
+  const i = Math.round(lg);
+  const t = i < 0 ? P.bars[0].time + i * SEC[b] : i >= n ? P.bars[n - 1].time + (i - n + 1) * SEC[b] : P.bars[i].time;
+  return { t, p: +p.toFixed(pricePrec) };
+}
+
+function rayXY(P, b, d, width) {
+  let x1 = timeToX(P, b, d.t1), x2 = timeToX(P, b, d.t2);
+  let y1 = P.candle.priceToCoordinate(d.p1), y2 = P.candle.priceToCoordinate(d.p2);
+  if ([x1, x2, y1, y2].some(v => v == null)) return null;
+  const anchors = [[x1, y1], [x2, y2]];
+  if (x2 < x1) [x1, y1, x2, y2] = [x2, y2, x1, y1];
+  if (x2 - x1 < 0.5) return { seg: [x1, y1, x2, y2], anchors };
+  return { seg: [x1, y1, width, y1 + (y2 - y1) * (width - x1) / (x2 - x1)], anchors };
+}
+
+function distToSeg(px, py, [x1, y1, x2, y2]) {
+  const dx = x2 - x1, dy = y2 - y1, l = dx * dx + dy * dy;
+  const u = l ? Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / l)) : 0;
+  return Math.hypot(px - (x1 + u * dx), py - (y1 + u * dy));
+}
+
+class TrendLines {
+  constructor(P, b) {
+    this.P = P; this.b = b; this.width = 0;
+    this.view = { renderer: () => ({ draw: target => this.draw(target) }) };
+  }
+  attached({ requestUpdate }) { this.requestUpdate = requestUpdate }
+  detached() { this.requestUpdate = null }
+  updateAllViews() {}
+  paneViews() { return [this.view] }
+  draw(target) {
+    target.useMediaCoordinateSpace(({ context: ctx, mediaSize }) => {
+      this.width = mediaSize.width;
+      const items = drawings.filter(d => d.type === "t").map(d => [d, false]);
+      if (pending) items.push([{ t1: pending.t, p1: pending.p, t2: (preview || pending).t, p2: (preview || pending).p }, true]);
+      ctx.save();
+      ctx.strokeStyle = ctx.fillStyle = C("--draw");
+      ctx.lineWidth = 1.5;
+      for (const [d, temp] of items) {
+        const r = rayXY(this.P, this.b, d, mediaSize.width);
+        if (!r) continue;
+        ctx.setLineDash(temp ? [4, 4] : []);
+        ctx.beginPath(); ctx.moveTo(r.seg[0], r.seg[1]); ctx.lineTo(r.seg[2], r.seg[3]); ctx.stroke();
+        for (const [x, y] of r.anchors) { ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill() }
+      }
+      ctx.restore();
+    });
+  }
+}
+
+const lineOpts = color => ({ color, lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
 
 for (const b of BARS) {
   const el = document.createElement("div");
@@ -102,23 +249,133 @@ for (const b of BARS) {
   candle.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.28 } });
   const vol = chart.addHistogramSeries({ priceScaleId: "", priceFormat: { type: "volume" }, lastValueVisible: false, priceLineVisible: false });
   vol.priceScale().applyOptions({ scaleMargins: { top: 0.78, bottom: 0 } });
-  const P = { el, chart, candle, vol, lbl: el.querySelector(".lbl"), last: null, hover: false };
+  const ma = MA_COLORS.map(c => chart.addLineSeries(lineOpts(c)));
+  const bbs = [0, 1, 2].map(i => chart.addLineSeries({ ...lineOpts(BB_COLOR), lineStyle: i === 1 ? 2 : 0 }));
+  const P = { el, chart, candle, vol, ma, bbs, bars: [], ind: null, hlines: [], lbl: el.querySelector(".lbl"), last: null, hover: false };
+  P.trend = new TrendLines(P, b);
+  candle.attachPrimitive(P.trend);
   chart.subscribeCrosshairMove(p => {
     const c = p.time && p.seriesData.get(candle), v = p.time && p.seriesData.get(vol);
     P.hover = !!c;
-    if (c) P.lbl.innerHTML = `<b>${b}</b>시 ${fp(c.open)} 고 ${fp(c.high)} 저 ${fp(c.low)} 종 ${fp(c.close)} · 량 ${v ? fv(v.value) : "-"}`;
+    if (c) renderLbl(b, idxOfTime(P.bars, p.time), `시 ${fp(c.open)} 고 ${fp(c.high)} 저 ${fp(c.low)} 종 ${fp(c.close)} · 량 ${v ? fv(v.value) : "-"}`);
     else showLbl(b);
+    if (mode === "t" && pending && p.point) { preview = pointToTP(P, b, p.point) || preview; repaint() }
   });
+  chart.subscribeClick(p => onChartClick(P, b, p));
   panes[b] = P;
 }
 
+function renderLbl(b, i, text) {
+  const P = panes[b], parts = [];
+  ind.ma.forEach((m, k) => {
+    if (!m.on) return;
+    const v = P.ind?.ma[k]?.[i];
+    parts.push(`<span style="color:${MA_COLORS[k]}">${m.type}${m.n} ${v == null ? "-" : fp(v)}</span>`);
+  });
+  if (ind.bb.on) {
+    const u = P.ind?.bb?.[0][i], l = P.ind?.bb?.[2][i];
+    parts.push(`<span style="color:${BB_COLOR}">BB ${u == null ? "-" : fp(u)} / ${l == null ? "-" : fp(l)}</span>`);
+  }
+  P.lbl.innerHTML = `<div><b>${b}</b>${text}</div>` + (parts.length ? `<div class="ind">${parts.join("")}</div>` : "");
+}
+
 function showLbl(b) {
-  const P = panes[b], r = P.last;
-  P.lbl.innerHTML = r ? `<b>${b}</b>거래량 ${fv(+r[volIdx()])}` : `<b>${b}</b>`;
+  const P = panes[b];
+  renderLbl(b, P.bars.length - 1, P.last ? `거래량 ${fv(+P.last[volIdx()])}` : "");
+}
+
+function paintInd(P, full) {
+  const cl = P.bars.map(x => x.close);
+  P.ind = {
+    ma: ind.ma.map(m => m.on ? (m.type === "EMA" ? ema : sma)(cl, m.n) : null),
+    bb: ind.bb.on ? bollinger(cl, ind.bb.n, ind.bb.k) : null
+  };
+  const n = P.bars.length;
+  const pt = (arr, j) => arr[j] == null ? { time: P.bars[j].time } : { time: P.bars[j].time, value: arr[j] };
+  const apply = (s, arr) => {
+    if (!arr) { if (full) s.setData([]); return }
+    if (full) s.setData(P.bars.map((_, j) => pt(arr, j)));
+    else if (n) s.update(pt(arr, n - 1));
+  };
+  P.ma.forEach((s, k) => apply(s, P.ind.ma[k]));
+  P.bbs.forEach((s, k) => apply(s, P.ind.bb && P.ind.bb[k]));
+}
+
+function repaint() { for (const b of BARS) panes[b].trend.requestUpdate?.() }
+
+function loadDrawings() {
+  try { drawings = JSON.parse(store.get("okx.draw." + inst, "[]")) } catch (e) { drawings = [] }
+}
+
+function saveDrawings() {
+  store.set("okx.draw." + inst, JSON.stringify(drawings));
+  updateClearBtn();
+}
+
+function syncDrawings() {
+  for (const b of BARS) {
+    const P = panes[b];
+    P.hlines.forEach(l => P.candle.removePriceLine(l));
+    P.hlines = drawings.filter(d => d.type === "h").map(d =>
+      P.candle.createPriceLine({ price: d.price, color: C("--draw"), lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: "" }));
+  }
+  repaint();
+}
+
+const HINTS = {
+  h: "수평선: 차트를 클릭하면 그 가격에 선이 생깁니다 · Esc 취소",
+  t: "추세선: 시작점과 끝점을 차례로 클릭하세요 · Esc 취소",
+  x: "지우기: 지울 선을 클릭하세요 · 다 지웠으면 Esc 또는 지움 버튼"
+};
+
+function setMode(m) {
+  mode = m; pending = null; preview = null;
+  document.body.classList.toggle("drawing", !!m);
+  $("hint").textContent = m ? HINTS[m] : "";
+  document.querySelectorAll(".tool[data-mode]").forEach(x => x.classList.toggle("active", x.dataset.mode === m));
+  repaint();
+}
+
+function hitTest(P, b, pt) {
+  let best = null, bestD = 7;
+  for (const d of drawings) {
+    let dist;
+    if (d.type === "h") {
+      const y = P.candle.priceToCoordinate(d.price);
+      dist = y == null ? Infinity : Math.abs(y - pt.y);
+    } else {
+      const r = rayXY(P, b, d, P.trend.width || 10000);
+      dist = r ? distToSeg(pt.x, pt.y, r.seg) : Infinity;
+    }
+    if (dist < bestD) { bestD = dist; best = d }
+  }
+  return best;
+}
+
+function onChartClick(P, b, param) {
+  if (!mode || !param.point) return;
+  if (mode === "x") {
+    const d = hitTest(P, b, param.point);
+    if (d) { drawings = drawings.filter(x => x !== d); saveDrawings(); syncDrawings() }
+    return;
+  }
+  const tp = pointToTP(P, b, param.point);
+  if (!tp) return;
+  if (mode === "h") {
+    drawings.push({ type: "h", price: tp.p });
+  } else if (!pending) {
+    pending = tp; preview = tp; repaint();
+    return;
+  } else {
+    drawings.push({ type: "t", t1: pending.t, p1: pending.p, t2: tp.t, p2: tp.p });
+  }
+  saveDrawings();
+  setMode(null);
+  syncDrawings();
 }
 
 function applyView() {
-  document.querySelectorAll("nav button").forEach(x => x.classList.toggle("active", shown.includes(x.dataset.v)));
+  document.querySelectorAll("nav button[data-v]").forEach(x => x.classList.toggle("active", shown.includes(x.dataset.v)));
   for (const b of BARS) panes[b].el.classList.toggle("hidden", !shown.includes(b));
   store.set("okx.shown", JSON.stringify(shown));
 }
@@ -147,8 +404,11 @@ async function load() {
   clearInterval(pingT); clearTimeout(retryT); clearInterval(tickT);
   if (ws) { ws.onclose = null; ws.close(); ws = null }
   setDot(false);
+  setMode(null);
   $("sym").value = inst;
   document.title = inst;
+  loadDrawings();
+  updateClearBtn();
   try {
     const type = /-SWAP$/.test(inst) ? "SWAP" : /-\d{6}$/.test(inst) ? "FUTURES" : "SPOT";
     const tick = (await getJson(`${API}/public/instruments?instType=${type}&instId=${inst}`))[0].tickSz;
@@ -158,8 +418,10 @@ async function load() {
       const rows = (await getJson(`${API}/market/candles?instId=${inst}&bar=${OKX_BAR[b]}&limit=300`)).slice().reverse();
       if (g !== gen) return;
       const P = panes[b], bars = rows.map(toBar);
-      P.candle.setData(bars.map(x => x[0]));
+      P.bars = bars.map(x => x[0]);
+      P.candle.setData(P.bars);
       P.vol.setData(bars.map(x => x[1]));
+      paintInd(P, true);
       P.last = rows.at(-1);
       showLbl(b);
       P.chart.timeScale().scrollToRealTime();
@@ -173,6 +435,7 @@ async function load() {
     return;
   }
   if (g !== gen) return;
+  syncDrawings();
   refreshTicker(g);
   tickT = setInterval(() => refreshTicker(g), 10000);
   connect(g);
@@ -195,6 +458,9 @@ function connect(g) {
     for (const r of m.data) {
       const [c, v] = toBar(r);
       try { P.candle.update(c); P.vol.update(v) } catch (err) { continue }
+      if (P.bars.length && P.bars[P.bars.length - 1].time === c.time) P.bars[P.bars.length - 1] = c;
+      else P.bars.push(c);
+      paintInd(P, false);
       P.last = r;
       if (!P.hover) showLbl(b);
       if (b === "1m") $("price").textContent = fp(+r[4]);
@@ -299,7 +565,8 @@ suggEl.addEventListener("mousedown", e => {
   e.preventDefault();
   pick(sugg[+it.dataset.i].id);
 });
-document.querySelectorAll("nav button").forEach(btn => {
+
+document.querySelectorAll("nav button[data-v]").forEach(btn => {
   const b = btn.dataset.v;
   btn.title = "클릭: 켜고 끄기 · 더블클릭: 이것만 보기";
   btn.onclick = () => {
@@ -308,6 +575,72 @@ document.querySelectorAll("nav button").forEach(btn => {
     applyView();
   };
   btn.ondblclick = () => { shown = [b]; applyView() };
+});
+
+document.querySelectorAll(".tool[data-mode]").forEach(btn => {
+  btn.onclick = () => setMode(mode === btn.dataset.mode ? null : btn.dataset.mode);
+});
+
+const indp = $("indp");
+
+function buildIndPanel() {
+  const sel = t => `<option${t === "SMA" ? " selected" : ""}>SMA</option><option${t === "EMA" ? " selected" : ""}>EMA</option>`;
+  indp.innerHTML = ind.ma.map((m, k) =>
+    `<div class="row"><label><input type="checkbox" data-f="on" data-k="${k}"${m.on ? " checked" : ""}><span class="sw" style="background:${MA_COLORS[k]}"></span></label>` +
+    `<select data-f="type" data-k="${k}">${sel(m.type)}</select><input type="number" min="1" max="300" data-f="n" data-k="${k}" value="${m.n}"></div>`).join("") +
+    `<div class="row"><label><input type="checkbox" data-f="bbon"${ind.bb.on ? " checked" : ""}><span class="sw" style="background:${BB_COLOR}"></span></label>` +
+    `<span class="nm">볼린저</span><input type="number" min="2" max="300" data-f="bbn" value="${ind.bb.n}" title="기간"><input type="number" min="0.5" max="5" step="0.5" data-f="bbk" value="${ind.bb.k}" title="표준편차 배수"></div>` +
+    `<div class="foot"><button id="clrDraw"></button></div>`;
+  updateClearBtn();
+}
+
+function updateClearBtn() {
+  const btn = $("clrDraw");
+  if (!btn) return;
+  btn.textContent = `${inst} 그린 선 모두 지우기 (${drawings.length})`;
+  btn.disabled = !drawings.length;
+}
+
+const clampInt = (v, lo, hi, d) => { const n = Math.round(+v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d };
+
+indp.addEventListener("change", e => {
+  const t = e.target, f = t.dataset.f, k = +t.dataset.k;
+  if (f === "on") ind.ma[k].on = t.checked;
+  else if (f === "type") ind.ma[k].type = t.value;
+  else if (f === "n") t.value = ind.ma[k].n = clampInt(t.value, 1, 300, ind.ma[k].n);
+  else if (f === "bbon") ind.bb.on = t.checked;
+  else if (f === "bbn") t.value = ind.bb.n = clampInt(t.value, 2, 300, ind.bb.n);
+  else if (f === "bbk") { const v = +t.value; t.value = ind.bb.k = Number.isFinite(v) ? Math.max(0.5, Math.min(5, v)) : ind.bb.k }
+  else return;
+  store.set("okx.ind", JSON.stringify(ind));
+  for (const b of BARS) { paintInd(panes[b], true); if (!panes[b].hover) showLbl(b) }
+});
+
+indp.addEventListener("click", e => {
+  if (e.target.id !== "clrDraw" || !drawings.length) return;
+  drawings = [];
+  saveDrawings();
+  syncDrawings();
+});
+
+$("indBtn").onclick = () => {
+  const open = !indp.classList.contains("open");
+  if (open) buildIndPanel();
+  indp.classList.toggle("open", open);
+  $("indBtn").classList.toggle("active", open);
+};
+
+document.addEventListener("mousedown", e => {
+  if (!indp.classList.contains("open") || indp.contains(e.target) || e.target === $("indBtn")) return;
+  indp.classList.remove("open");
+  $("indBtn").classList.remove("active");
+});
+
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape" || document.activeElement === symEl) return;
+  setMode(null);
+  indp.classList.remove("open");
+  $("indBtn").classList.remove("active");
 });
 
 applyView();
