@@ -1,7 +1,7 @@
 import AppKit
 import WebKit
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
     private var window: NSWindow!
     private var webView: WKWebView!
     private var pinItem: NSMenuItem!
@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
+        config.userContentController.add(self, name: "win")
         webView = WKWebView(frame: .zero, configuration: config)
         webView.setValue(false, forKey: "drawsBackground")
         if #available(macOS 13.3, *) { webView.isInspectable = true }
@@ -51,6 +52,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.name == "win", let body = message.body as? [String: Any], let dy = body["dy"] as? Double, dy.isFinite else { return }
+        resizeWindow(by: CGFloat(dy))
+    }
+
+    private func resizeWindow(by dy: CGFloat) {
+        let visible = window.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? window.frame
+        var frame = window.frame
+        let height = min(max(frame.height + dy, window.minSize.height), visible.height)
+        let top = frame.maxY
+        frame.size.height = height
+        frame.origin.y = max(top - height, visible.minY)
+        if frame.maxY > visible.maxY { frame.origin.y = visible.maxY - height }
+        window.setFrame(frame, display: true, animate: true)
+    }
 
     @objc private func reload() { webView.reload() }
 
