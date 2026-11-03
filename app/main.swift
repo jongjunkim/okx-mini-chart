@@ -54,8 +54,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard message.name == "win", let body = message.body as? [String: Any], let dy = body["dy"] as? Double, dy.isFinite else { return }
+        guard message.name == "win", let body = message.body as? [String: Any] else { return }
+        if body["shot"] as? Bool == true { capture(); return }
+        guard let dy = body["dy"] as? Double, dy.isFinite else { return }
         resizeWindow(by: CGFloat(dy))
+    }
+
+    // 창 내용을 PNG 로 ~/Pictures/OKX Mini Chart 에 저장하고 클립보드에도 넣는다(옵시디언 등에 바로 붙여넣기).
+    @objc private func capture() {
+        webView.evaluateJavaScript("prepShot()") { [weak self] result, _ in
+            guard let self else { return }
+            let insts = (result as? String) ?? ""
+            // 토스트·선택 표시가 사라진 화면이 그려질 시간을 준다
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                self.webView.takeSnapshot(with: nil) { image, error in
+                    guard let image, let tiff = image.tiffRepresentation,
+                          let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else {
+                        self.shotDone(nil, error?.localizedDescription ?? "이미지를 만들지 못했어요")
+                        return
+                    }
+                    let pb = NSPasteboard.general
+                    pb.clearContents()
+                    pb.setData(png, forType: .png)
+
+                    let fmt = DateFormatter()
+                    fmt.dateFormat = "yyyy-MM-dd HHmmss"
+                    let name = "OKX \(fmt.string(from: Date()))\(insts.isEmpty ? "" : " " + insts).png"
+                    let dir = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask)[0]
+                        .appendingPathComponent("OKX Mini Chart", isDirectory: true)
+                    do {
+                        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                        try png.write(to: dir.appendingPathComponent(name))
+                        self.shotDone(name, nil)
+                    } catch {
+                        self.shotDone(nil, "클립보드엔 복사됐지만 저장 실패: \(error.localizedDescription)")
+                    }
+                }
+            }
+        }
+    }
+
+    private func shotDone(_ name: String?, _ err: String?) {
+        let js = { (s: String?) in s.map { "\"\($0.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\""))\"" } ?? "null" }
+        webView.evaluateJavaScript("shotDone(\(js(name)), \(js(err)))")
     }
 
     private func resizeWindow(by dy: CGFloat) {
@@ -134,6 +175,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         pinItem = NSMenuItem(title: "항상 위에 표시", action: #selector(togglePin), keyEquivalent: "t")
         pinItem.target = self
         view.addItem(pinItem)
+        let shotItem = NSMenuItem(title: "화면 캡처", action: #selector(capture), keyEquivalent: "s")
+        shotItem.target = self
+        view.addItem(shotItem)
         view.addItem(.separator())
         let more = NSMenuItem(title: "더 투명하게", action: #selector(moreTransparent), keyEquivalent: "-")
         more.keyEquivalentModifierMask = [.command, .option]

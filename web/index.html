@@ -80,7 +80,7 @@ main{flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto}
 </head>
 <body>
 <nav>
-  <button class="tool" data-mode="h" title="수평선(지지·저항): 누른 뒤 차트를 클릭">수평</button><button class="tool" data-mode="t" title="추세선: 누른 뒤 두 점을 클릭">추세</button><button class="tool" data-mode="r" title="가격 범위: 누른 뒤 두 점을 클릭하면 가격 차이·변동률·봉 수를 보여줍니다">범위</button><button class="tool" data-mode="L" title="롱 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">롱</button><button class="tool" data-mode="S" title="숏 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">숏</button><button id="indBtn" title="이동평균·볼린저밴드">지표</button>
+  <button class="tool" data-mode="h" title="수평선(지지·저항): 누른 뒤 차트를 클릭">수평</button><button class="tool" data-mode="t" title="추세선: 누른 뒤 두 점을 클릭">추세</button><button class="tool" data-mode="r" title="가격 범위: 누른 뒤 두 점을 클릭하면 가격 차이·변동률·봉 수를 보여줍니다">범위</button><button class="tool" data-mode="L" title="롱 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">롱</button><button class="tool" data-mode="S" title="숏 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">숏</button><button id="indBtn" title="이동평균·볼린저밴드">지표</button><button id="shotBtn" title="화면 캡처(⌘S): 사진 폴더의 OKX Mini Chart 에 저장하고 클립보드에도 복사합니다">캡처</button>
   <span id="dot" title="실시간 연결"></span>
   <div id="indp"></div>
 </nav>
@@ -766,11 +766,33 @@ function closeSlot(S) {
   saveSlots();
   syncSubs();
   undoInfo = { cfg: { inst: S.inst, tf: S.tf, collapsed: S.collapsed, w: S.w }, index: i, h };
-  $("toastMsg").textContent = `${S.inst || "빈"} 칸을 닫았어요`;
+  showToast(`${S.inst || "빈"} 칸을 닫았어요`, true);
+}
+
+function showToast(msg, undo) {
+  if (!undo) undoInfo = null;
+  $("toastMsg").textContent = msg;
+  $("undo").hidden = !undo;
   $("toast").classList.add("open");
   clearTimeout(toastT);
-  toastT = setTimeout(() => { $("toast").classList.remove("open"); undoInfo = null }, 5000);
+  toastT = setTimeout(() => { $("toast").classList.remove("open"); undoInfo = null }, undo ? 5000 : 2500);
 }
+
+// 캡처 직전에 앱이 부른다. 토스트·안내·선택을 걷어 내고 파일 이름에 쓸 종목을 돌려준다.
+window.prepShot = () => {
+  clearTimeout(toastT);
+  $("toast").classList.remove("open");
+  undoInfo = null;
+  setMode(null);
+  select(null);
+  return [...new Set(slots.map(S => S.inst).filter(Boolean))].join("_");
+};
+window.shotDone = (name, err) => showToast(err ? `캡처 실패: ${err}` : `저장하고 복사했어요 · ${name}`, false);
+
+$("shotBtn").onclick = () => {
+  try { window.webkit.messageHandlers.win.postMessage({ shot: true }) }
+  catch (e) { showToast("캡처는 앱에서만 돼요", false) }
+};
 
 $("undo").addEventListener("click", () => {
   if (!undoInfo || slots.length >= MAX_SLOTS) return;
