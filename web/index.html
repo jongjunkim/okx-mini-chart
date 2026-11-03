@@ -32,9 +32,12 @@ nav button.active{color:var(--text);border-color:#4a5262}
 nav button.tool{flex:none;padding:3px 7px}
 nav button.tool.active{color:var(--draw);border-color:var(--draw)}
 nav .sep{flex:none;width:5px}
-#hint{display:none;padding:0 8px 4px;color:var(--draw);font-size:11px}
-body.drawing #hint{display:block}
+#hint{display:none;position:absolute;left:50%;bottom:30px;transform:translateX(-50%);z-index:10;max-width:calc(100% - 16px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;background:#161a21eb;border:1px solid var(--draw);border-radius:4px;padding:3px 8px;color:var(--draw);font-size:11px}
+body.hinting #hint{display:block}
 body.drawing .c *{cursor:crosshair!important}
+.c.hov-ns *{cursor:ns-resize!important}
+.c.hov-pt *{cursor:pointer!important}
+.c.hov-move *{cursor:move!important}
 #indp{position:absolute;right:8px;top:100%;margin-top:2px;width:236px;background:var(--panel);border:1px solid #3a414d;border-radius:6px;padding:6px 8px;z-index:30;display:none;box-shadow:0 8px 24px #0009}
 #indp.open{display:block}
 #indp .row{display:flex;align-items:center;gap:6px;padding:3px 0}
@@ -48,7 +51,7 @@ body.drawing .c *{cursor:crosshair!important}
 #indp .foot{border-top:1px solid var(--line);margin-top:4px;padding-top:6px}
 #indp button{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;font:inherit;padding:4px;cursor:pointer}
 #indp button:disabled{color:var(--muted);cursor:default}
-main{flex:1;display:flex;flex-direction:column;min-height:0}
+main{position:relative;flex:1;display:flex;flex-direction:column;min-height:0}
 .pane{position:relative;flex:1;min-height:0;border-top:1px solid var(--line)}
 .pane.hidden{display:none}
 .lbl{position:absolute;left:6px;top:4px;z-index:3;color:var(--muted);pointer-events:none;font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -67,11 +70,10 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
 <nav>
   <button data-v="1m">1m</button><button data-v="5m">5m</button><button data-v="15m">15m</button><button data-v="1h">1h</button><button data-v="4h">4h</button><button data-v="1d">1d</button>
   <span class="sep"></span>
-  <button class="tool" data-mode="h" title="수평선(지지·저항): 누른 뒤 차트를 클릭">수평</button><button class="tool" data-mode="t" title="추세선: 누른 뒤 차트에서 두 점을 클릭">추세</button><button class="tool" data-mode="x" title="지우기: 누른 뒤 지울 선을 클릭">지움</button><button class="tool" id="indBtn" title="이동평균·볼린저밴드">지표</button>
+  <button class="tool" data-mode="h" title="수평선(지지·저항): 누른 뒤 차트를 클릭. 그린 선은 클릭해서 끌면 옮겨지고 Backspace 로 지웁니다">수평</button><button class="tool" data-mode="t" title="추세선: 누른 뒤 차트에서 두 점을 클릭. 끝점을 끌면 기울기, 선을 끌면 위치가 바뀌고 Backspace 로 지웁니다">추세</button><button class="tool" id="indBtn" title="이동평균·볼린저밴드">지표</button>
   <div id="indp"></div>
 </nav>
-<div id="hint"></div>
-<main id="main"></main>
+<main id="main"><div id="hint"></div></main>
 <script>
 const OKX_BAR = { "1m": "1m", "5m": "5m", "15m": "15m", "1h": "1H", "4h": "4H", "1d": "1D" };
 const SEC = { "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 14400, "1d": 86400 };
@@ -103,7 +105,7 @@ let ind = (() => {
     bb: { on: false, n: 20, k: 2 }
   };
 })();
-let drawings = [], mode = null, pending = null, preview = null;
+let drawings = [], mode = null, pending = null, preview = null, selected = null, drag = null;
 let ws, pingT, retryT, tickT, gen = 0, pricePrec = 2;
 const panes = {};
 
@@ -229,13 +231,19 @@ class TrendLines {
       if (pending) items.push([{ t1: pending.t, p1: pending.p, t2: (preview || pending).t, p2: (preview || pending).p }, true]);
       ctx.save();
       ctx.strokeStyle = ctx.fillStyle = C("--draw");
-      ctx.lineWidth = 1.5;
       for (const [d, temp] of items) {
         const r = rayXY(this.P, this.b, d, mediaSize.width);
         if (!r) continue;
+        const sel = d === selected;
+        ctx.lineWidth = sel ? 2.5 : 1.5;
         ctx.setLineDash(temp ? [4, 4] : []);
         ctx.beginPath(); ctx.moveTo(r.seg[0], r.seg[1]); ctx.lineTo(r.seg[2], r.seg[3]); ctx.stroke();
-        for (const [x, y] of r.anchors) { ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill() }
+        ctx.setLineDash([]);
+        for (const [x, y] of r.anchors) {
+          ctx.beginPath(); ctx.arc(x, y, sel ? 4.5 : 2.5, 0, Math.PI * 2);
+          if (sel) { ctx.fillStyle = C("--bg"); ctx.fill(); ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = C("--draw") }
+          else ctx.fill();
+        }
       }
       ctx.restore();
     });
@@ -278,6 +286,10 @@ for (const b of BARS) {
     if (mode === "t" && pending && p.point) { preview = pointToTP(P, b, p.point) || preview; repaint() }
   });
   chart.subscribeClick(p => onChartClick(P, b, p));
+  const box = el.querySelector(".c");
+  box.addEventListener("pointerdown", e => onPointerDown(P, b, box, e), true);
+  box.addEventListener("mousedown", e => { if (drag) e.stopPropagation() }, true);
+  box.addEventListener("pointermove", e => { if (!drag && !mode) setHoverCursor(P, b, box, e) });
   panes[b] = P;
 }
 
@@ -333,7 +345,7 @@ function syncDrawings() {
     const P = panes[b];
     P.hlines.forEach(l => P.candle.removePriceLine(l));
     P.hlines = drawings.filter(d => d.type === "h").map(d =>
-      P.candle.createPriceLine({ price: d.price, color: C("--draw"), lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: "" }));
+      P.candle.createPriceLine({ price: d.price, color: C("--draw"), lineWidth: d === selected ? 2 : 1, lineStyle: 0, axisLabelVisible: true, title: "" }));
   }
   repaint();
 }
@@ -341,53 +353,129 @@ function syncDrawings() {
 const HINTS = {
   h: "수평선: 차트를 클릭하면 그 가격에 선이 생깁니다 · Esc 취소",
   t: "추세선: 시작점과 끝점을 차례로 클릭하세요 · Esc 취소",
-  x: "지우기: 지울 선을 클릭하세요 · 다 지웠으면 Esc 또는 지움 버튼"
+  sel: "선택됨: 끌어서 옮기고 Backspace 로 지웁니다 · Esc 선택 해제"
 };
+
+function updateHint() {
+  const h = mode ? HINTS[mode] : selected ? HINTS.sel : "";
+  $("hint").textContent = h;
+  document.body.classList.toggle("hinting", !!h);
+}
 
 function setMode(m) {
   mode = m; pending = null; preview = null;
+  if (m) selected = null;
   document.body.classList.toggle("drawing", !!m);
-  $("hint").textContent = m ? HINTS[m] : "";
   document.querySelectorAll(".tool[data-mode]").forEach(x => x.classList.toggle("active", x.dataset.mode === m));
-  repaint();
+  updateHint();
+  syncDrawings();
+}
+
+function select(d) {
+  if (selected === d) return;
+  selected = d;
+  updateHint();
+  syncDrawings();
+}
+
+function deleteSelected() {
+  drawings = drawings.filter(x => x !== selected);
+  selected = null;
+  saveDrawings();
+  updateHint();
+  syncDrawings();
 }
 
 function hitTest(P, b, pt) {
   let best = null, bestD = 7;
   for (const d of drawings) {
-    let dist;
     if (d.type === "h") {
       const y = P.candle.priceToCoordinate(d.price);
-      dist = y == null ? Infinity : Math.abs(y - pt.y);
-    } else {
-      const r = rayXY(P, b, d, P.trend.width || 10000);
-      dist = r ? distToSeg(pt.x, pt.y, r.seg) : Infinity;
+      const dist = y == null ? Infinity : Math.abs(y - pt.y);
+      if (dist < bestD) { bestD = dist; best = { d, part: "h" } }
+      continue;
     }
-    if (dist < bestD) { bestD = dist; best = d }
+    const r = rayXY(P, b, d, P.trend.width || 10000);
+    if (!r) continue;
+    r.anchors.forEach(([x, y], i) => {
+      const dist = Math.hypot(x - pt.x, y - pt.y) - 3;
+      if (dist < bestD) { bestD = dist; best = { d, part: i ? "a2" : "a1" } }
+    });
+    const dist = distToSeg(pt.x, pt.y, r.seg);
+    if (dist < bestD) { bestD = dist; best = { d, part: "body" } }
   }
   return best;
 }
 
+function localPt(box, e) {
+  const r = box.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+
+function setHoverCursor(P, b, box, e) {
+  const pt = localPt(box, e), part = pt.x <= P.trend.width ? hitTest(P, b, pt)?.part : null;
+  box.classList.toggle("hov-ns", part === "h");
+  box.classList.toggle("hov-pt", part === "a1" || part === "a2");
+  box.classList.toggle("hov-move", part === "body");
+}
+
+function onPointerDown(P, b, box, e) {
+  if (mode || e.button !== 0) return;
+  const pt = localPt(box, e);
+  if (pt.x > P.trend.width) return;
+  const hit = hitTest(P, b, pt);
+  if (!hit) { if (selected) select(null); return }
+  e.stopPropagation();
+  select(hit.d);
+  drag = { P, b, box, d: hit.d, part: hit.part, orig: { ...hit.d }, tp0: pointToTP(P, b, pt), moved: false };
+}
+
+function moveHline(d) {
+  const i = drawings.filter(x => x.type === "h").indexOf(d);
+  for (const b of BARS) panes[b].hlines[i]?.applyOptions({ price: d.price });
+}
+
+window.addEventListener("pointermove", e => {
+  if (!drag) return;
+  const { P, b, box, d, part, orig, tp0 } = drag;
+  const tp = pointToTP(P, b, localPt(box, e));
+  if (!tp || !tp0) return;
+  drag.moved = true;
+  if (part === "h") { d.price = tp.p; moveHline(d); return }
+  if (part === "a1") { d.t1 = tp.t; d.p1 = tp.p }
+  else if (part === "a2") { d.t2 = tp.t; d.p2 = tp.p }
+  else {
+    const dt = tp.t - tp0.t, dp = tp.p - tp0.p;
+    d.t1 = orig.t1 + dt; d.t2 = orig.t2 + dt;
+    d.p1 = +(orig.p1 + dp).toFixed(pricePrec); d.p2 = +(orig.p2 + dp).toFixed(pricePrec);
+  }
+  repaint();
+});
+
+window.addEventListener("pointerup", () => {
+  if (!drag) return;
+  const moved = drag.moved;
+  drag = null;
+  if (moved) saveDrawings();
+});
+
 function onChartClick(P, b, param) {
   if (!mode || !param.point) return;
-  if (mode === "x") {
-    const d = hitTest(P, b, param.point);
-    if (d) { drawings = drawings.filter(x => x !== d); saveDrawings(); syncDrawings() }
-    return;
-  }
   const tp = pointToTP(P, b, param.point);
   if (!tp) return;
+  let d;
   if (mode === "h") {
-    drawings.push({ type: "h", price: tp.p });
+    d = { type: "h", price: tp.p };
   } else if (!pending) {
     pending = tp; preview = tp; repaint();
     return;
   } else {
-    drawings.push({ type: "t", t1: pending.t, p1: pending.p, t2: tp.t, p2: tp.p });
+    d = { type: "t", t1: pending.t, p1: pending.p, t2: tp.t, p2: tp.p };
   }
+  drawings.push(d);
   saveDrawings();
   setMode(null);
-  syncDrawings();
+  select(d);
 }
 
 function applyView() {
@@ -420,6 +508,8 @@ async function load() {
   clearInterval(pingT); clearTimeout(retryT); clearInterval(tickT);
   if (ws) { ws.onclose = null; ws.close(); ws = null }
   setDot(false);
+  selected = null;
+  drag = null;
   setMode(null);
   $("sym").value = inst;
   document.title = inst;
@@ -693,6 +783,8 @@ indp.addEventListener("change", e => {
 indp.addEventListener("click", e => {
   if (e.target.id !== "clrDraw" || !drawings.length) return;
   drawings = [];
+  selected = null;
+  updateHint();
   saveDrawings();
   syncDrawings();
 });
@@ -711,8 +803,15 @@ document.addEventListener("mousedown", e => {
 });
 
 document.addEventListener("keydown", e => {
+  const typing = /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName || "");
+  if ((e.key === "Backspace" || e.key === "Delete") && selected && !typing) {
+    e.preventDefault();
+    deleteSelected();
+    return;
+  }
   if (e.key !== "Escape" || document.activeElement === symEl) return;
   setMode(null);
+  select(null);
   indp.classList.remove("open");
   $("indBtn").classList.remove("active");
 });
