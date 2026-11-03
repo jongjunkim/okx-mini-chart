@@ -251,9 +251,10 @@ for (const b of BARS) {
   vol.priceScale().applyOptions({ scaleMargins: { top: 0.78, bottom: 0 } });
   const ma = MA_COLORS.map(c => chart.addLineSeries(lineOpts(c)));
   const bbs = [0, 1, 2].map(i => chart.addLineSeries({ ...lineOpts(BB_COLOR), lineStyle: i === 1 ? 2 : 0 }));
-  const P = { el, chart, candle, vol, ma, bbs, bars: [], ind: null, hlines: [], lbl: el.querySelector(".lbl"), last: null, hover: false };
+  const P = { el, chart, candle, vol, ma, bbs, bars: [], vols: [], ind: null, hlines: [], lbl: el.querySelector(".lbl"), last: null, hover: false, loadingOld: false, noMore: false };
   P.trend = new TrendLines(P, b);
   candle.attachPrimitive(P.trend);
+  chart.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r && r.from < 60) loadOlder(P, b, gen) });
   chart.subscribeCrosshairMove(p => {
     const c = p.time && p.seriesData.get(candle), v = p.time && p.seriesData.get(vol);
     P.hover = !!c;
@@ -419,8 +420,10 @@ async function load() {
       if (g !== gen) return;
       const P = panes[b], bars = rows.map(toBar);
       P.bars = bars.map(x => x[0]);
+      P.vols = bars.map(x => x[1]);
+      P.noMore = false;
       P.candle.setData(P.bars);
-      P.vol.setData(bars.map(x => x[1]));
+      P.vol.setData(P.vols);
       paintInd(P, true);
       P.last = rows.at(-1);
       showLbl(b);
@@ -439,6 +442,44 @@ async function load() {
   refreshTicker(g);
   tickT = setInterval(() => refreshTicker(g), 10000);
   connect(g);
+  warmup(g);
+}
+
+const WARMUP_BARS = 1000;
+
+async function warmup(g) {
+  for (const b of [...shown, ...BARS.filter(x => !shown.includes(x))]) {
+    const P = panes[b];
+    while (g === gen && !P.noMore && P.bars.length < WARMUP_BARS) {
+      const before = P.bars.length;
+      await loadOlder(P, b, g);
+      if (P.bars.length === before) break;
+      await new Promise(r => setTimeout(r, 150));
+    }
+  }
+}
+
+async function loadOlder(P, b, g) {
+  if (P.loadingOld || P.noMore || !P.bars.length || g !== gen) return;
+  P.loadingOld = true;
+  try {
+    const oldest = (P.bars[0].time - TZ) * 1000;
+    const rows = (await getJson(`${API}/market/history-candles?instId=${inst}&bar=${OKX_BAR[b]}&after=${oldest}&limit=300`)).slice().reverse();
+    if (g !== gen) return;
+    const add = rows.map(toBar).filter(x => x[0].time < P.bars[0].time);
+    if (!add.length) { P.noMore = true; return }
+    const range = P.chart.timeScale().getVisibleLogicalRange();
+    P.bars = add.map(x => x[0]).concat(P.bars);
+    P.vols = add.map(x => x[1]).concat(P.vols);
+    P.candle.setData(P.bars);
+    P.vol.setData(P.vols);
+    paintInd(P, true);
+    if (range) P.chart.timeScale().setVisibleLogicalRange({ from: range.from + add.length, to: range.to + add.length });
+    repaint();
+  } catch (e) {
+  } finally {
+    P.loadingOld = false;
+  }
 }
 
 function connect(g) {
@@ -458,8 +499,8 @@ function connect(g) {
     for (const r of m.data) {
       const [c, v] = toBar(r);
       try { P.candle.update(c); P.vol.update(v) } catch (err) { continue }
-      if (P.bars.length && P.bars[P.bars.length - 1].time === c.time) P.bars[P.bars.length - 1] = c;
-      else P.bars.push(c);
+      if (P.bars.length && P.bars[P.bars.length - 1].time === c.time) { P.bars[P.bars.length - 1] = c; P.vols[P.vols.length - 1] = v }
+      else { P.bars.push(c); P.vols.push(v) }
       paintInd(P, false);
       P.last = r;
       if (!P.hover) showLbl(b);
