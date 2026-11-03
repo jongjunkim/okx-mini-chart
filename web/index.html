@@ -24,6 +24,13 @@ body.drawing .c *{cursor:crosshair!important}
 .c.hov-ew *{cursor:ew-resize!important}
 #indp{position:absolute;right:8px;top:100%;margin-top:2px;width:236px;background:var(--panel);border:1px solid #3a414d;border-radius:6px;padding:6px 8px;z-index:30;display:none;box-shadow:0 8px 24px #0009}
 #indp.open{display:block}
+#topp{position:absolute;right:8px;top:100%;margin-top:2px;width:min(360px,calc(100vw - 16px));background:var(--panel);border:1px solid #3a414d;border-radius:6px;padding:4px 0;z-index:30;display:none;box-shadow:0 8px 24px #0009}
+#topp.open{display:block}
+#topp .hd{display:flex;align-items:center;gap:4px;padding:2px 8px 6px;border-bottom:1px solid var(--line);margin-bottom:2px;color:var(--muted);font-size:11px}
+#topp .hd span{margin-right:auto}
+#topp .hd button{padding:1px 6px;font-size:11px}
+#topp .rk{width:16px;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums;flex:none}
+#topp .vol{width:58px;text-align:right;color:var(--text);font-variant-numeric:tabular-nums;flex:none}
 #indp .row{display:flex;align-items:center;gap:6px;padding:3px 0}
 #indp label{display:flex;align-items:center;gap:4px;cursor:pointer}
 #indp input[type=color]{width:26px;height:20px;padding:0;border:1px solid var(--line);border-radius:4px;background:none;cursor:pointer;flex:none}
@@ -80,9 +87,10 @@ main{flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto}
 </head>
 <body>
 <nav>
-  <button class="tool" data-mode="h" title="수평선(지지·저항): 누른 뒤 차트를 클릭">수평</button><button class="tool" data-mode="t" title="추세선: 누른 뒤 두 점을 클릭">추세</button><button class="tool" data-mode="r" title="가격 범위: 누른 뒤 두 점을 클릭하면 가격 차이·변동률·봉 수를 보여줍니다">범위</button><button class="tool" data-mode="L" title="롱 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">롱</button><button class="tool" data-mode="S" title="숏 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">숏</button><button id="indBtn" title="이동평균·볼린저밴드">지표</button><button id="shotBtn" title="화면 캡처(⌘S): 바탕화면에 저장하고 클립보드에도 복사합니다">캡처</button>
+  <button class="tool" data-mode="h" title="수평선(지지·저항): 누른 뒤 차트를 클릭">수평</button><button class="tool" data-mode="t" title="추세선: 누른 뒤 두 점을 클릭">추세</button><button class="tool" data-mode="r" title="가격 범위: 누른 뒤 두 점을 클릭하면 가격 차이·변동률·봉 수를 보여줍니다">범위</button><button class="tool" data-mode="L" title="롱 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">롱</button><button class="tool" data-mode="S" title="숏 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">숏</button><button id="indBtn" title="이동평균·볼린저밴드">지표</button><button id="topBtn" title="24시간 거래대금 상위 10종목. 누르면 선택한 칸에 띄웁니다">TOP10</button><button id="shotBtn" title="화면 캡처(⌘S): 바탕화면에 저장하고 클립보드에도 복사합니다">캡처</button>
   <span id="dot" title="실시간 연결"></span>
   <div id="indp"></div>
+  <div id="topp"></div>
 </nav>
 <main id="main"><button id="add">＋ 종목 추가</button></main>
 <div id="hint"></div>
@@ -1151,8 +1159,54 @@ indp.addEventListener("click", e => {
   syncDrawings(inst);
 });
 
+const topp = $("topp");
+let topKind = "all", topList = [];
+
+function closeTop() { topp.classList.remove("open"); $("topBtn").classList.remove("active") }
+
+// 24시간 거래대금(USD) 상위 10. OKX 시세 API 는 24시간 누적만 주므로 '금일'이 아니라 최근 24시간 기준이다.
+async function renderTop() {
+  if (Date.now() - uniAt > 60000) uniP = null;
+  if (!topList.length) topp.innerHTML = '<div class="it none">불러오는 중…</div>';
+  await loadUniverse();
+  if (!topp.classList.contains("open")) return;
+  topList = universe.filter(u => u.usd > 0 && (topKind === "all" || u.type === topKind)).sort((a, b) => b.usd - a.usd).slice(0, 10);
+  const tab = (k, t) => `<button data-k="${k}" class="${topKind === k ? "active" : ""}">${t}</button>`;
+  topp.innerHTML = `<div class="hd"><span>24시간 거래대금 TOP 10 (USD)</span>${tab("all", "전체")}${tab("현물", "현물")}${tab("무기한", "무기한")}</div>` +
+    (topList.length ? topList.map((u, i) => {
+      const pc = u.open ? (u.last - u.open) / u.open * 100 : 0;
+      return `<div class="it" data-i="${i}"><span class="rk">${i + 1}</span><span class="id">${esc(u.id)}</span><span class="tag">${u.type}</span>` +
+        `<span class="vol">$${fv(u.usd)}</span>` +
+        `<span class="ipc" style="color:${pc >= 0 ? C("--up") : C("--down")}">${pctStr(pc)}</span></div>`;
+    }).join("") : '<div class="it none">시세를 받지 못했어요</div>');
+}
+
+$("topBtn").onclick = () => {
+  if (topp.classList.contains("open")) { closeTop(); return }
+  indp.classList.remove("open");
+  $("indBtn").classList.remove("active");
+  topp.classList.add("open");
+  $("topBtn").classList.add("active");
+  renderTop();
+};
+
+topp.addEventListener("click", e => {
+  const k = e.target.closest("button[data-k]")?.dataset.k;
+  if (k) { topKind = k; topList = []; renderTop(); return }
+  const it = e.target.closest(".it[data-i]");
+  if (!it) return;
+  const S = activeSlot && slots.includes(activeSlot) ? activeSlot : slots[0];
+  closeTop();
+  pickInst(S, topList[+it.dataset.i].id);
+});
+
+document.addEventListener("mousedown", e => {
+  if (topp.classList.contains("open") && !topp.contains(e.target) && e.target !== $("topBtn")) closeTop();
+});
+
 $("indBtn").onclick = () => {
   const open = !indp.classList.contains("open");
+  if (open) closeTop();
   if (open) buildIndPanel();
   indp.classList.toggle("open", open);
   $("indBtn").classList.toggle("active", open);
@@ -1176,6 +1230,7 @@ document.addEventListener("keydown", e => {
   select(null);
   indp.classList.remove("open");
   $("indBtn").classList.remove("active");
+  closeTop();
 });
 
 for (const cfg of loadSlotConfig()) slots.push(makeSlot(cfg));
@@ -1183,7 +1238,7 @@ activeSlot = slots[0];
 layout();
 slots.forEach(loadSlot);
 connect();
-setInterval(() => refreshTicker(), 10000);
+setInterval(() => { refreshTicker(); if (topp.classList.contains("open")) renderTop() }, 10000);
 </script>
 </body>
 </html>
