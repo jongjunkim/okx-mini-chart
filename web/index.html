@@ -43,7 +43,7 @@ body.drawing .c *{cursor:crosshair!important}
 #indp input[type=color]::-webkit-color-swatch-wrapper{padding:2px}
 #indp input[type=color]::-webkit-color-swatch{border:none;border-radius:2px}
 #indp select,#indp input[type=number]{background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;font:inherit;padding:2px 4px}
-#indp select,#indp .nm{width:62px}
+#indp select,#indp .nm{width:72px}
 #indp input[type=number]{width:52px}
 #indp .foot{border-top:1px solid var(--line);margin-top:4px;padding-top:6px}
 #indp button{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;font:inherit;padding:4px;cursor:pointer}
@@ -127,6 +127,17 @@ function sma(cl, n) {
     s += cl[i];
     if (i >= n) s -= cl[i - n];
     if (i >= n - 1) out[i] = s / n;
+  }
+  return out;
+}
+
+function vwma(cl, vl, n) {
+  const out = new Array(cl.length).fill(null);
+  let pv = 0, v = 0;
+  for (let i = 0; i < cl.length; i++) {
+    pv += cl[i] * vl[i]; v += vl[i];
+    if (i >= n) { pv -= cl[i - n] * vl[i - n]; v -= vl[i - n] }
+    if (i >= n - 1 && v > 0) out[i] = pv / v;
   }
   return out;
 }
@@ -290,9 +301,9 @@ function showLbl(b) {
 }
 
 function paintInd(P, full) {
-  const cl = P.bars.map(x => x.close);
+  const cl = P.bars.map(x => x.close), vl = P.vols.map(x => x.value);
   P.ind = {
-    ma: ind.ma.map(m => m.on ? (m.type === "EMA" ? ema : sma)(cl, m.n) : null),
+    ma: ind.ma.map(m => !m.on ? null : m.type === "EMA" ? ema(cl, m.n) : m.type === "VWMA" ? vwma(cl, vl, m.n) : sma(cl, m.n)),
     bb: ind.bb.on ? bollinger(cl, ind.bb.n, ind.bb.k) : null
   };
   const n = P.bars.length;
@@ -629,7 +640,7 @@ document.querySelectorAll(".tool[data-mode]").forEach(btn => {
 const indp = $("indp");
 
 function buildIndPanel() {
-  const sel = t => `<option${t === "SMA" ? " selected" : ""}>SMA</option><option${t === "EMA" ? " selected" : ""}>EMA</option>`;
+  const sel = t => ["SMA", "EMA", "VWMA"].map(x => `<option${t === x ? " selected" : ""}>${x}</option>`).join("");
   indp.innerHTML = ind.ma.map((m, k) =>
     `<div class="row"><label><input type="checkbox" data-f="on" data-k="${k}"${m.on ? " checked" : ""}></label><input type="color" data-f="color" data-k="${k}" value="${maColor(k)}" title="선 색">` +
     `<select data-f="type" data-k="${k}">${sel(m.type)}</select><input type="number" min="1" max="300" data-f="n" data-k="${k}" value="${m.n}"></div>`).join("") +
