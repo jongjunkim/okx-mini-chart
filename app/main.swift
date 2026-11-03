@@ -60,7 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         resizeWindow(by: CGFloat(dy))
     }
 
-    // 창 내용을 PNG 로 ~/Pictures/OKX Mini Chart 에 저장하고 클립보드에도 넣는다(옵시디언 등에 바로 붙여넣기).
+    // 창 내용을 PNG 로 바탕화면(~/Desktop)에 저장하고 클립보드에도 넣는다(옵시디언 등에 바로 붙여넣기).
     @objc private func capture() {
         webView.evaluateJavaScript("prepShot()") { [weak self] result, _ in
             guard let self else { return }
@@ -80,10 +80,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
                     let fmt = DateFormatter()
                     fmt.dateFormat = "yyyy-MM-dd HHmmss"
                     let name = "OKX \(fmt.string(from: Date()))\(insts.isEmpty ? "" : " " + insts).png"
-                    let dir = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask)[0]
-                        .appendingPathComponent("OKX Mini Chart", isDirectory: true)
+                    let dir = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask)[0]
                     do {
-                        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
                         try png.write(to: dir.appendingPathComponent(name))
                         self.shotDone(name, nil)
                     } catch {
