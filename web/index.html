@@ -39,7 +39,9 @@ body.drawing .c *{cursor:crosshair!important}
 #indp.open{display:block}
 #indp .row{display:flex;align-items:center;gap:6px;padding:3px 0}
 #indp label{display:flex;align-items:center;gap:4px;cursor:pointer}
-#indp .sw{display:inline-block;width:12px;height:3px;border-radius:2px}
+#indp input[type=color]{width:26px;height:20px;padding:0;border:1px solid var(--line);border-radius:4px;background:none;cursor:pointer;flex:none}
+#indp input[type=color]::-webkit-color-swatch-wrapper{padding:2px}
+#indp input[type=color]::-webkit-color-swatch{border:none;border-radius:2px}
 #indp select,#indp input[type=number]{background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;font:inherit;padding:2px 4px}
 #indp select,#indp .nm{width:62px}
 #indp input[type=number]{width:52px}
@@ -81,6 +83,8 @@ const css = getComputedStyle(document.documentElement);
 const C = k => css.getPropertyValue(k).trim();
 const MA_COLORS = ["#f5c542", "#c77dff", "#2ec4b6", "#ff8c42"];
 const BB_COLOR = "#8a94a6";
+const maColor = k => ind.ma[k].color || MA_COLORS[k];
+const bbColor = () => ind.bb.color || BB_COLOR;
 const store = {
   get(k, d) { try { return localStorage.getItem(k) || d } catch (e) { return d } },
   set(k, v) { try { localStorage.setItem(k, v) } catch (e) {} }
@@ -249,8 +253,8 @@ for (const b of BARS) {
   candle.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.28 } });
   const vol = chart.addHistogramSeries({ priceScaleId: "", priceFormat: { type: "volume" }, lastValueVisible: false, priceLineVisible: false });
   vol.priceScale().applyOptions({ scaleMargins: { top: 0.78, bottom: 0 } });
-  const ma = MA_COLORS.map(c => chart.addLineSeries(lineOpts(c)));
-  const bbs = [0, 1, 2].map(i => chart.addLineSeries({ ...lineOpts(BB_COLOR), lineStyle: i === 1 ? 2 : 0 }));
+  const ma = MA_COLORS.map((_, k) => chart.addLineSeries(lineOpts(maColor(k))));
+  const bbs = [0, 1, 2].map(i => chart.addLineSeries({ ...lineOpts(bbColor()), lineStyle: i === 1 ? 2 : 0 }));
   const P = { el, chart, candle, vol, ma, bbs, bars: [], vols: [], ind: null, hlines: [], lbl: el.querySelector(".lbl"), last: null, hover: false, loadingOld: false, noMore: false };
   P.trend = new TrendLines(P, b);
   candle.attachPrimitive(P.trend);
@@ -271,11 +275,11 @@ function renderLbl(b, i, text) {
   ind.ma.forEach((m, k) => {
     if (!m.on) return;
     const v = P.ind?.ma[k]?.[i];
-    parts.push(`<span style="color:${MA_COLORS[k]}">${m.type}${m.n} ${v == null ? "-" : fp(v)}</span>`);
+    parts.push(`<span style="color:${maColor(k)}">${m.type}${m.n} ${v == null ? "-" : fp(v)}</span>`);
   });
   if (ind.bb.on) {
     const u = P.ind?.bb?.[0][i], l = P.ind?.bb?.[2][i];
-    parts.push(`<span style="color:${BB_COLOR}">BB ${u == null ? "-" : fp(u)} / ${l == null ? "-" : fp(l)}</span>`);
+    parts.push(`<span style="color:${bbColor()}">BB ${u == null ? "-" : fp(u)} / ${l == null ? "-" : fp(l)}</span>`);
   }
   P.lbl.innerHTML = `<div><b>${b}</b>${text}</div>` + (parts.length ? `<div class="ind">${parts.join("")}</div>` : "");
 }
@@ -627,9 +631,9 @@ const indp = $("indp");
 function buildIndPanel() {
   const sel = t => `<option${t === "SMA" ? " selected" : ""}>SMA</option><option${t === "EMA" ? " selected" : ""}>EMA</option>`;
   indp.innerHTML = ind.ma.map((m, k) =>
-    `<div class="row"><label><input type="checkbox" data-f="on" data-k="${k}"${m.on ? " checked" : ""}><span class="sw" style="background:${MA_COLORS[k]}"></span></label>` +
+    `<div class="row"><label><input type="checkbox" data-f="on" data-k="${k}"${m.on ? " checked" : ""}></label><input type="color" data-f="color" data-k="${k}" value="${maColor(k)}" title="선 색">` +
     `<select data-f="type" data-k="${k}">${sel(m.type)}</select><input type="number" min="1" max="300" data-f="n" data-k="${k}" value="${m.n}"></div>`).join("") +
-    `<div class="row"><label><input type="checkbox" data-f="bbon"${ind.bb.on ? " checked" : ""}><span class="sw" style="background:${BB_COLOR}"></span></label>` +
+    `<div class="row"><label><input type="checkbox" data-f="bbon"${ind.bb.on ? " checked" : ""}></label><input type="color" data-f="bbcolor" value="${bbColor()}" title="선 색">` +
     `<span class="nm">볼린저</span><input type="number" min="2" max="300" data-f="bbn" value="${ind.bb.n}" title="기간"><input type="number" min="0.5" max="5" step="0.5" data-f="bbk" value="${ind.bb.k}" title="표준편차 배수"></div>` +
     `<div class="foot"><button id="clrDraw"></button></div>`;
   updateClearBtn();
@@ -644,7 +648,25 @@ function updateClearBtn() {
 
 const clampInt = (v, lo, hi, d) => { const n = Math.round(+v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d };
 
+function onColor(e) {
+  const t = e.target, f = t.dataset.f;
+  if (f === "color") ind.ma[+t.dataset.k].color = t.value;
+  else if (f === "bbcolor") ind.bb.color = t.value;
+  else return false;
+  store.set("okx.ind", JSON.stringify(ind));
+  for (const b of BARS) {
+    const P = panes[b];
+    P.ma.forEach((s, k) => s.applyOptions({ color: maColor(k) }));
+    P.bbs.forEach(s => s.applyOptions({ color: bbColor() }));
+    if (!P.hover) showLbl(b);
+  }
+  return true;
+}
+
+indp.addEventListener("input", onColor);
+
 indp.addEventListener("change", e => {
+  if (onColor(e)) return;
   const t = e.target, f = t.dataset.f, k = +t.dataset.k;
   if (f === "on") ind.ma[k].on = t.checked;
   else if (f === "type") ind.ma[k].type = t.value;
