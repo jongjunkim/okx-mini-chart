@@ -44,11 +44,13 @@ main{flex:1;display:flex;flex-direction:column;min-height:0}
   <div id="sugg"></div>
 </header>
 <nav>
-  <button data-v="all">전체</button><button data-v="1m">1분</button><button data-v="5m">5분</button><button data-v="15m">15분</button>
+  <button data-v="1m">1m</button><button data-v="5m">5m</button><button data-v="15m">15m</button><button data-v="1h">1h</button><button data-v="4h">4h</button><button data-v="1d">1d</button>
 </nav>
 <main id="main"></main>
 <script>
-const BARS = ["1m", "5m", "15m"];
+const OKX_BAR = { "1m": "1m", "5m": "5m", "15m": "15m", "1h": "1H", "4h": "4H", "1d": "1Dutc" };
+const BARS = Object.keys(OKX_BAR);
+const BAR_OF = Object.fromEntries(BARS.map(b => [OKX_BAR[b], b]));
 const API = "https://www.okx.com/api/v5";
 const TZ = -new Date().getTimezoneOffset() * 60;
 const css = getComputedStyle(document.documentElement);
@@ -59,7 +61,10 @@ const store = {
 };
 
 let inst = store.get("okx.inst", "BTC-USDT");
-let view = store.get("okx.view", "all");
+let shown = (() => {
+  try { const v = JSON.parse(store.get("okx.shown", "")).filter(b => BARS.includes(b)); if (v.length) return v } catch (e) {}
+  return ["1m", "5m", "15m"];
+})();
 let ws, pingT, retryT, tickT, gen = 0, pricePrec = 2;
 const panes = {};
 const $ = id => document.getElementById(id);
@@ -87,7 +92,7 @@ for (const b of BARS) {
     layout: { background: { color: C("--bg") }, textColor: C("--muted"), fontSize: 10, attributionLogo: false },
     grid: { vertLines: { color: C("--line") }, horzLines: { color: C("--line") } },
     rightPriceScale: { borderColor: C("--line") },
-    timeScale: { borderColor: C("--line"), timeVisible: true, secondsVisible: false, rightOffset: 3 },
+    timeScale: { borderColor: C("--line"), timeVisible: b !== "1d", secondsVisible: false, rightOffset: 3 },
     crosshair: { mode: 0 }
   });
   const candle = chart.addCandlestickSeries({
@@ -113,9 +118,9 @@ function showLbl(b) {
 }
 
 function applyView() {
-  document.querySelectorAll("nav button").forEach(x => x.classList.toggle("active", x.dataset.v === view));
-  for (const b of BARS) panes[b].el.classList.toggle("hidden", view !== "all" && view !== b);
-  store.set("okx.view", view);
+  document.querySelectorAll("nav button").forEach(x => x.classList.toggle("active", shown.includes(x.dataset.v)));
+  for (const b of BARS) panes[b].el.classList.toggle("hidden", !shown.includes(b));
+  store.set("okx.shown", JSON.stringify(shown));
 }
 
 function setDot(on) { $("dot").classList.toggle("on", on) }
@@ -150,7 +155,7 @@ async function load() {
     pricePrec = (tick.split(".")[1] || "").length;
     for (const b of BARS) panes[b].candle.applyOptions({ priceFormat: { type: "price", precision: pricePrec, minMove: +tick } });
     await Promise.all(BARS.map(async b => {
-      const rows = (await getJson(`${API}/market/candles?instId=${inst}&bar=${b}&limit=300`)).slice().reverse();
+      const rows = (await getJson(`${API}/market/candles?instId=${inst}&bar=${OKX_BAR[b]}&limit=300`)).slice().reverse();
       if (g !== gen) return;
       const P = panes[b], bars = rows.map(toBar);
       P.candle.setData(bars.map(x => x[0]));
@@ -177,7 +182,7 @@ function connect(g) {
   const s = new WebSocket("wss://ws.okx.com/ws/v5/business");
   ws = s;
   s.onopen = () => {
-    s.send(JSON.stringify({ op: "subscribe", args: BARS.map(b => ({ channel: "candle" + b, instId: inst })) }));
+    s.send(JSON.stringify({ op: "subscribe", args: BARS.map(b => ({ channel: "candle" + OKX_BAR[b], instId: inst })) }));
     setDot(true);
     pingT = setInterval(() => s.readyState === 1 && s.send("ping"), 20000);
   };
@@ -185,7 +190,7 @@ function connect(g) {
     if (e.data === "pong") return;
     const m = JSON.parse(e.data);
     if (!m.data || !m.arg || m.arg.instId !== inst) return;
-    const b = m.arg.channel.slice(6), P = panes[b];
+    const b = BAR_OF[m.arg.channel.slice(6)], P = panes[b];
     if (!P) return;
     for (const r of m.data) {
       const [c, v] = toBar(r);
@@ -294,7 +299,16 @@ suggEl.addEventListener("mousedown", e => {
   e.preventDefault();
   pick(sugg[+it.dataset.i].id);
 });
-document.querySelectorAll("nav button").forEach(btn => btn.onclick = () => { view = btn.dataset.v; applyView() });
+document.querySelectorAll("nav button").forEach(btn => {
+  const b = btn.dataset.v;
+  btn.title = "클릭: 켜고 끄기 · 더블클릭: 이것만 보기";
+  btn.onclick = () => {
+    if (shown.includes(b)) { if (shown.length > 1) shown = shown.filter(x => x !== b) }
+    else shown = BARS.filter(x => x === b || shown.includes(x));
+    applyView();
+  };
+  btn.ondblclick = () => { shown = [b]; applyView() };
+});
 
 applyView();
 load();
