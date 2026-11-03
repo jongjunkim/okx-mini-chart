@@ -513,6 +513,7 @@ function resetSeries(S) {
   S.bars = []; S.vols = []; S.last = null; S.ready = false;
   S.candle.setData([]); S.vol.setData([]);
   S.ma.forEach(s => s.setData([])); S.bbs.forEach(s => s.setData([]));
+  S.candle.priceScale().applyOptions({ autoScale: true });
 }
 
 async function loadSlot(S) {
