@@ -26,18 +26,20 @@ header{position:relative;display:flex;align-items:center;gap:8px;padding:6px 8px
 #chg{font-variant-numeric:tabular-nums}
 #dot{width:7px;height:7px;border-radius:50%;background:#555;margin-left:auto;flex:none}
 #dot.on{background:#2fbf71}
-nav{position:relative;display:flex;gap:3px;padding:4px 8px}
+nav{position:relative;display:flex;flex-wrap:wrap;gap:4px 8px;padding:4px 8px}
+nav .grp{display:flex;gap:3px}
+nav .tfs{flex:1 1 200px}
 nav button{flex:1;background:var(--panel);border:1px solid var(--line);color:var(--muted);padding:3px 0;border-radius:4px;font:inherit;cursor:pointer;white-space:nowrap}
 nav button.active{color:var(--text);border-color:#4a5262}
 nav button.tool{flex:none;padding:3px 7px}
 nav button.tool.active{color:var(--draw);border-color:var(--draw)}
-nav .sep{flex:none;width:5px}
 #hint{display:none;position:absolute;left:50%;bottom:30px;transform:translateX(-50%);z-index:10;max-width:calc(100% - 16px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;background:#161a21eb;border:1px solid var(--draw);border-radius:4px;padding:3px 8px;color:var(--draw);font-size:11px}
 body.hinting #hint{display:block}
 body.drawing .c *{cursor:crosshair!important}
 .c.hov-ns *{cursor:ns-resize!important}
 .c.hov-pt *{cursor:pointer!important}
 .c.hov-move *{cursor:move!important}
+.c.hov-ew *{cursor:ew-resize!important}
 #indp{position:absolute;right:8px;top:100%;margin-top:2px;width:236px;background:var(--panel);border:1px solid #3a414d;border-radius:6px;padding:6px 8px;z-index:30;display:none;box-shadow:0 8px 24px #0009}
 #indp.open{display:block}
 #indp .row{display:flex;align-items:center;gap:6px;padding:3px 0}
@@ -68,9 +70,8 @@ main{position:relative;flex:1;display:flex;flex-direction:column;min-height:0}
   <div id="sugg"></div>
 </header>
 <nav>
-  <button data-v="1m">1m</button><button data-v="5m">5m</button><button data-v="15m">15m</button><button data-v="1h">1h</button><button data-v="4h">4h</button><button data-v="1d">1d</button>
-  <span class="sep"></span>
-  <button class="tool" data-mode="h" title="수평선(지지·저항): 누른 뒤 차트를 클릭. 그린 선은 클릭해서 끌면 옮겨지고 Backspace 로 지웁니다">수평</button><button class="tool" data-mode="t" title="추세선: 누른 뒤 차트에서 두 점을 클릭. 끝점을 끌면 기울기, 선을 끌면 위치가 바뀌고 Backspace 로 지웁니다">추세</button><button class="tool" id="indBtn" title="이동평균·볼린저밴드">지표</button>
+  <div class="grp tfs"><button data-v="1m">1m</button><button data-v="5m">5m</button><button data-v="15m">15m</button><button data-v="1h">1h</button><button data-v="4h">4h</button><button data-v="1d">1d</button></div>
+  <div class="grp"><button class="tool" data-mode="h" title="수평선(지지·저항): 누른 뒤 차트를 클릭">수평</button><button class="tool" data-mode="t" title="추세선: 누른 뒤 두 점을 클릭">추세</button><button class="tool" data-mode="r" title="가격 범위: 누른 뒤 두 점을 클릭하면 가격 차이·변동률·봉 수를 보여줍니다">범위</button><button class="tool" data-mode="L" title="롱 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">롱</button><button class="tool" data-mode="S" title="숏 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">숏</button><button class="tool" id="indBtn" title="이동평균·볼린저밴드">지표</button></div>
   <div id="indp"></div>
 </nav>
 <main id="main"><div id="hint"></div></main>
@@ -215,6 +216,96 @@ function distToSeg(px, py, [x1, y1, x2, y2]) {
   return Math.hypot(px - (x1 + u * dx), py - (y1 + u * dy));
 }
 
+const PROFIT = "#26a69a", LOSS = "#ef5350", ENTRY = "#9aa3af";
+const TWO_CLICK = ["t", "r"];
+const inside = (pt, x1, y1, x2, y2) => pt.x >= x1 && pt.x <= x2 && pt.y >= y1 && pt.y <= y2;
+const pctStr = v => (v >= 0 ? "+" : "") + v.toFixed(2) + "%";
+
+function boxXY(P, b, d) {
+  const x1 = timeToX(P, b, d.t1), x2 = timeToX(P, b, d.t2);
+  if (x1 == null || x2 == null) return null;
+  const y = v => P.candle.priceToCoordinate(v);
+  if (d.type === "r") {
+    const y1 = y(d.p1), y2 = y(d.p2);
+    return y1 == null || y2 == null ? null : { x1, y1, x2, y2 };
+  }
+  const ye = y(d.entry), yt = y(d.tp), ys = y(d.sl);
+  return ye == null || yt == null || ys == null ? null : { xl: Math.min(x1, x2), xr: Math.max(x1, x2), ye, yt, ys };
+}
+
+function tag(ctx, text, x, y, bg, width) {
+  ctx.font = "11px -apple-system, BlinkMacSystemFont, sans-serif";
+  const w = ctx.measureText(text).width + 10, h = 17, lx = Math.max(2, Math.min(width - w - 2, x - w / 2));
+  ctx.fillStyle = bg;
+  ctx.fillRect(lx, y - h / 2, w, h);
+  ctx.fillStyle = "#fff";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, lx + 5, y + 0.5);
+}
+
+function handle(ctx, x, y, color) {
+  ctx.fillStyle = C("--bg");
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.fillRect(x - 3.5, y - 3.5, 7, 7);
+  ctx.strokeRect(x - 3.5, y - 3.5, 7, 7);
+}
+
+function drawTrend(ctx, P, b, d, temp, sel, width) {
+  const r = rayXY(P, b, d, width);
+  if (!r) return;
+  const col = C("--draw");
+  ctx.strokeStyle = ctx.fillStyle = col;
+  ctx.lineWidth = sel ? 2.5 : 1.5;
+  ctx.setLineDash(temp ? [4, 4] : []);
+  ctx.beginPath(); ctx.moveTo(r.seg[0], r.seg[1]); ctx.lineTo(r.seg[2], r.seg[3]); ctx.stroke();
+  ctx.setLineDash([]);
+  for (const [x, y] of r.anchors) {
+    ctx.beginPath(); ctx.arc(x, y, sel ? 4.5 : 2.5, 0, Math.PI * 2);
+    if (sel) { ctx.fillStyle = C("--bg"); ctx.fill(); ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = col }
+    else ctx.fill();
+  }
+}
+
+function drawRange(ctx, P, b, d, temp, sel, width) {
+  const g = boxXY(P, b, d);
+  if (!g) return;
+  const up = d.p2 >= d.p1, col = up ? C("--up") : C("--down");
+  const xl = Math.min(g.x1, g.x2), xr = Math.max(g.x1, g.x2), yt = Math.min(g.y1, g.y2), yb = Math.max(g.y1, g.y2), xm = (xl + xr) / 2;
+  ctx.fillStyle = col + "26";
+  ctx.fillRect(xl, yt, xr - xl, yb - yt);
+  ctx.strokeStyle = col;
+  ctx.lineWidth = sel ? 1.5 : 1;
+  ctx.setLineDash(temp ? [4, 4] : []);
+  ctx.strokeRect(xl, yt, xr - xl, yb - yt);
+  ctx.setLineDash([]);
+  const ah = up ? 6 : -6;
+  ctx.beginPath(); ctx.moveTo(xm, g.y1); ctx.lineTo(xm, g.y2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(xm - 4, g.y2 + ah); ctx.lineTo(xm, g.y2); ctx.lineTo(xm + 4, g.y2 + ah); ctx.stroke();
+  const dp = d.p2 - d.p1, bars = Math.abs(Math.round((d.t2 - d.t1) / SEC[b]));
+  tag(ctx, `${dp >= 0 ? "+" : "-"}${fp(Math.abs(dp))} (${pctStr(dp / d.p1 * 100)}) · ${bars}봉`, xm, up ? yt - 12 : yb + 12, col, width);
+  if (sel) { handle(ctx, g.x1, g.y1, col); handle(ctx, g.x2, g.y2, col) }
+}
+
+function drawPosition(ctx, P, b, d, sel, width) {
+  const g = boxXY(P, b, d);
+  if (!g) return;
+  const long = d.type === "L", w = g.xr - g.xl, dir = long ? 1 : -1, xm = (g.xl + g.xr) / 2;
+  ctx.fillStyle = PROFIT + "33";
+  ctx.fillRect(g.xl, Math.min(g.ye, g.yt), w, Math.abs(g.yt - g.ye));
+  ctx.fillStyle = LOSS + "33";
+  ctx.fillRect(g.xl, Math.min(g.ye, g.ys), w, Math.abs(g.ys - g.ye));
+  ctx.strokeStyle = ENTRY;
+  ctx.lineWidth = sel ? 1.5 : 1;
+  ctx.beginPath(); ctx.moveTo(g.xl, g.ye); ctx.lineTo(g.xr, g.ye); ctx.stroke();
+  const gain = (d.tp - d.entry) / d.entry * 100 * dir, loss = (d.sl - d.entry) / d.entry * 100 * dir;
+  const rr = Math.abs(d.tp - d.entry) / Math.max(Math.abs(d.entry - d.sl), 1e-12);
+  tag(ctx, `목표 ${fp(d.tp)} (${pctStr(gain)})`, xm, g.yt + (g.yt < g.ye ? -12 : 12), PROFIT, width);
+  tag(ctx, `손절 ${fp(d.sl)} (${pctStr(loss)})`, xm, g.ys + (g.ys < g.ye ? -12 : 12), LOSS, width);
+  tag(ctx, `${long ? "롱" : "숏"} ${fp(d.entry)} · 손익비 ${rr.toFixed(2)}`, xm, g.ye, "#4a5262", width);
+  if (sel) { handle(ctx, g.xl, g.yt, PROFIT); handle(ctx, g.xl, g.ys, LOSS); handle(ctx, g.xr, g.ye, ENTRY) }
+}
+
 class TrendLines {
   constructor(P, b) {
     this.P = P; this.b = b; this.width = 0;
@@ -226,26 +317,20 @@ class TrendLines {
   paneViews() { return [this.view] }
   draw(target) {
     target.useMediaCoordinateSpace(({ context: ctx, mediaSize }) => {
-      this.width = mediaSize.width;
-      const items = drawings.filter(d => d.type === "t").map(d => [d, false]);
-      if (pending) items.push([{ t1: pending.t, p1: pending.p, t2: (preview || pending).t, p2: (preview || pending).p }, true]);
-      ctx.save();
-      ctx.strokeStyle = ctx.fillStyle = C("--draw");
-      for (const [d, temp] of items) {
-        const r = rayXY(this.P, this.b, d, mediaSize.width);
-        if (!r) continue;
-        const sel = d === selected;
-        ctx.lineWidth = sel ? 2.5 : 1.5;
-        ctx.setLineDash(temp ? [4, 4] : []);
-        ctx.beginPath(); ctx.moveTo(r.seg[0], r.seg[1]); ctx.lineTo(r.seg[2], r.seg[3]); ctx.stroke();
-        ctx.setLineDash([]);
-        for (const [x, y] of r.anchors) {
-          ctx.beginPath(); ctx.arc(x, y, sel ? 4.5 : 2.5, 0, Math.PI * 2);
-          if (sel) { ctx.fillStyle = C("--bg"); ctx.fill(); ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = C("--draw") }
-          else ctx.fill();
-        }
+      const W = this.width = mediaSize.width, P = this.P, b = this.b;
+      const list = drawings.filter(d => d.type !== "h").map(d => [d, false]);
+      if (pending && TWO_CLICK.includes(mode)) {
+        const q = preview || pending;
+        list.push([{ type: mode, t1: pending.t, p1: pending.p, t2: q.t, p2: q.p }, true]);
       }
-      ctx.restore();
+      for (const [d, temp] of list) {
+        const sel = d === selected;
+        ctx.save();
+        if (d.type === "t") drawTrend(ctx, P, b, d, temp, sel, W);
+        else if (d.type === "r") drawRange(ctx, P, b, d, temp, sel, W);
+        else drawPosition(ctx, P, b, d, sel, W);
+        ctx.restore();
+      }
     });
   }
 }
@@ -283,7 +368,7 @@ for (const b of BARS) {
     P.hover = !!c;
     if (c) renderLbl(b, idxOfTime(P.bars, p.time), `시 ${fp(c.open)} 고 ${fp(c.high)} 저 ${fp(c.low)} 종 ${fp(c.close)} · 량 ${v ? fv(v.value) : "-"}`);
     else showLbl(b);
-    if (mode === "t" && pending && p.point) { preview = pointToTP(P, b, p.point) || preview; repaint() }
+    if (TWO_CLICK.includes(mode) && pending && p.point) { preview = pointToTP(P, b, p.point) || preview; repaint() }
   });
   chart.subscribeClick(p => onChartClick(P, b, p));
   const box = el.querySelector(".c");
@@ -353,7 +438,10 @@ function syncDrawings() {
 const HINTS = {
   h: "수평선: 차트를 클릭하면 그 가격에 선이 생깁니다 · Esc 취소",
   t: "추세선: 시작점과 끝점을 차례로 클릭하세요 · Esc 취소",
-  sel: "선택됨: 끌어서 옮기고 Backspace 로 지웁니다 · Esc 선택 해제"
+  r: "가격 범위: 시작점과 끝점을 차례로 클릭하세요 · Esc 취소",
+  L: "롱 포지션: 진입가를 클릭하세요 · 생긴 뒤 목표·손절선을 끌어 조정 · Esc 취소",
+  S: "숏 포지션: 진입가를 클릭하세요 · 생긴 뒤 목표·손절선을 끌어 조정 · Esc 취소",
+  sel: "선택됨: 끌어서 조정하고 Backspace 로 지웁니다 · Esc 선택 해제"
 };
 
 function updateHint() {
@@ -388,21 +476,36 @@ function deleteSelected() {
 
 function hitTest(P, b, pt) {
   let best = null, bestD = 7;
+  const consider = (d, part, dist) => { if (dist < bestD) { bestD = dist; best = { d, part } } };
+  const near = (x, y) => Math.hypot(x - pt.x, y - pt.y) - 3;
   for (const d of drawings) {
     if (d.type === "h") {
       const y = P.candle.priceToCoordinate(d.price);
-      const dist = y == null ? Infinity : Math.abs(y - pt.y);
-      if (dist < bestD) { bestD = dist; best = { d, part: "h" } }
-      continue;
+      if (y != null) consider(d, "h", Math.abs(y - pt.y));
+    } else if (d.type === "t") {
+      const r = rayXY(P, b, d, P.trend.width || 10000);
+      if (!r) continue;
+      r.anchors.forEach(([x, y], i) => consider(d, i ? "a2" : "a1", near(x, y)));
+      consider(d, "body", distToSeg(pt.x, pt.y, r.seg));
+    } else if (d.type === "r") {
+      const g = boxXY(P, b, d);
+      if (!g) continue;
+      consider(d, "a1", near(g.x1, g.y1));
+      consider(d, "a2", near(g.x2, g.y2));
+      if (inside(pt, Math.min(g.x1, g.x2), Math.min(g.y1, g.y2), Math.max(g.x1, g.x2), Math.max(g.y1, g.y2))) consider(d, "body", 5);
+    } else {
+      const g = boxXY(P, b, d);
+      if (!g) continue;
+      const top = Math.min(g.yt, g.ys), bot = Math.max(g.yt, g.ys);
+      if (pt.x >= g.xl - 4 && pt.x <= g.xr + 4) {
+        consider(d, "tp", Math.abs(pt.y - g.yt) - 1);
+        consider(d, "sl", Math.abs(pt.y - g.ys) - 1);
+        consider(d, "body", Math.abs(pt.y - g.ye));
+      }
+      if (pt.y >= top && pt.y <= bot) consider(d, "w", Math.abs(pt.x - g.xr) + 0.5);
+      consider(d, "w", near(g.xr, g.ye));
+      if (inside(pt, g.xl, top, g.xr, bot)) consider(d, "body", 5);
     }
-    const r = rayXY(P, b, d, P.trend.width || 10000);
-    if (!r) continue;
-    r.anchors.forEach(([x, y], i) => {
-      const dist = Math.hypot(x - pt.x, y - pt.y) - 3;
-      if (dist < bestD) { bestD = dist; best = { d, part: i ? "a2" : "a1" } }
-    });
-    const dist = distToSeg(pt.x, pt.y, r.seg);
-    if (dist < bestD) { bestD = dist; best = { d, part: "body" } }
   }
   return best;
 }
@@ -414,8 +517,9 @@ function localPt(box, e) {
 
 function setHoverCursor(P, b, box, e) {
   const pt = localPt(box, e), part = pt.x <= P.trend.width ? hitTest(P, b, pt)?.part : null;
-  box.classList.toggle("hov-ns", part === "h");
+  box.classList.toggle("hov-ns", part === "h" || part === "tp" || part === "sl");
   box.classList.toggle("hov-pt", part === "a1" || part === "a2");
+  box.classList.toggle("hov-ew", part === "w");
   box.classList.toggle("hov-move", part === "body");
 }
 
@@ -442,12 +546,19 @@ window.addEventListener("pointermove", e => {
   if (!tp || !tp0) return;
   drag.moved = true;
   if (part === "h") { d.price = tp.p; moveHline(d); return }
+  const dt = tp.t - tp0.t, dp = tp.p - tp0.p, tick = 10 ** -pricePrec, rp = v => +v.toFixed(pricePrec);
+  const pos = d.type === "L" || d.type === "S", long = d.type === "L";
   if (part === "a1") { d.t1 = tp.t; d.p1 = tp.p }
   else if (part === "a2") { d.t2 = tp.t; d.p2 = tp.p }
-  else {
-    const dt = tp.t - tp0.t, dp = tp.p - tp0.p;
+  else if (part === "tp") d.tp = rp(long ? Math.max(tp.p, d.entry + tick) : Math.min(tp.p, d.entry - tick));
+  else if (part === "sl") d.sl = rp(long ? Math.min(tp.p, d.entry - tick) : Math.max(tp.p, d.entry + tick));
+  else if (part === "w") d.t2 = Math.max(tp.t, d.t1 + SEC[b]);
+  else if (pos) {
     d.t1 = orig.t1 + dt; d.t2 = orig.t2 + dt;
-    d.p1 = +(orig.p1 + dp).toFixed(pricePrec); d.p2 = +(orig.p2 + dp).toFixed(pricePrec);
+    d.entry = rp(orig.entry + dp); d.tp = rp(orig.tp + dp); d.sl = rp(orig.sl + dp);
+  } else {
+    d.t1 = orig.t1 + dt; d.t2 = orig.t2 + dt;
+    d.p1 = rp(orig.p1 + dp); d.p2 = rp(orig.p2 + dp);
   }
   repaint();
 });
@@ -459,6 +570,12 @@ window.addEventListener("pointerup", () => {
   if (moved) saveDrawings();
 });
 
+function newPosition(P, b, type, tp) {
+  const h = P.el.clientHeight, dir = type === "L" ? 1 : -1, rp = v => +v.toFixed(pricePrec);
+  const span = Math.abs(P.candle.coordinateToPrice(h * 0.1) - P.candle.coordinateToPrice(h * 0.65)) || tp.p * 0.01;
+  return { type, t1: tp.t, t2: tp.t + 20 * SEC[b], entry: tp.p, tp: rp(tp.p + dir * span * 0.2), sl: rp(tp.p - dir * span * 0.1) };
+}
+
 function onChartClick(P, b, param) {
   if (!mode || !param.point) return;
   const tp = pointToTP(P, b, param.point);
@@ -466,11 +583,13 @@ function onChartClick(P, b, param) {
   let d;
   if (mode === "h") {
     d = { type: "h", price: tp.p };
+  } else if (mode === "L" || mode === "S") {
+    d = newPosition(P, b, mode, tp);
   } else if (!pending) {
     pending = tp; preview = tp; repaint();
     return;
   } else {
-    d = { type: "t", t1: pending.t, p1: pending.p, t2: tp.t, p2: tp.p };
+    d = { type: mode, t1: pending.t, p1: pending.p, t2: tp.t, p2: tp.p };
   }
   drawings.push(d);
   saveDrawings();
