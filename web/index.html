@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OKX 차트</title>
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+:root{--bg:#0f1115;--panel:#161a21;--line:#232831;--text:#d6dae1;--muted:#7d8592;--up:#f04452;--down:#3182f6}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:12px -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif}
+body{display:flex;flex-direction:column}
+header{position:relative;display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--line)}
+#sugg{position:absolute;left:8px;top:32px;width:min(360px,calc(100vw - 16px));max-height:60vh;overflow:auto;background:var(--panel);border:1px solid #3a414d;border-radius:6px;z-index:20;display:none;box-shadow:0 8px 24px #0009}
+#sugg.open{display:block}
+.it{display:flex;align-items:center;gap:8px;padding:5px 8px;cursor:pointer}
+.it.sel{background:#232a36}
+.it[data-i]:hover{background:#1d232d}
+.it .id{flex:1;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.it .tag{font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:0 4px;flex:none}
+.it .px{color:var(--muted);font-variant-numeric:tabular-nums}
+.it .pc{width:60px;text-align:right;font-variant-numeric:tabular-nums}
+.it.empty{color:var(--muted);cursor:default}
+#sym{width:150px;background:var(--panel);border:1px solid var(--line);color:var(--text);padding:3px 6px;border-radius:4px;font:inherit;text-transform:uppercase}
+#price{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+#chg{font-variant-numeric:tabular-nums}
+#dot{width:7px;height:7px;border-radius:50%;background:#555;margin-left:auto;flex:none}
+#dot.on{background:#2fbf71}
+nav{display:flex;gap:3px;padding:4px 8px}
+nav button{flex:1;background:var(--panel);border:1px solid var(--line);color:var(--muted);padding:3px 0;border-radius:4px;font:inherit;cursor:pointer}
+nav button.active{color:var(--text);border-color:#4a5262}
+main{flex:1;display:flex;flex-direction:column;min-height:0}
+.pane{position:relative;flex:1;min-height:0;border-top:1px solid var(--line)}
+.pane.hidden{display:none}
+.lbl{position:absolute;left:6px;top:4px;z-index:3;color:var(--muted);pointer-events:none;font-variant-numeric:tabular-nums;white-space:nowrap}
+.lbl b{color:var(--text);font-weight:600;margin-right:6px}
+.c{position:absolute;inset:0}
+</style>
+</head>
+<body>
+<header>
+  <input id="sym" spellcheck="false" autocomplete="off" title="예: BTC-USDT, ETH-USDT-SWAP (Enter)">
+  <span id="price">-</span><span id="chg"></span><span id="dot" title="실시간 연결"></span>
+  <div id="sugg"></div>
+</header>
+<nav>
+  <button data-v="all">전체</button><button data-v="1m">1분</button><button data-v="5m">5분</button><button data-v="15m">15분</button>
+</nav>
+<main id="main"></main>
+<script>
+const BARS = ["1m", "5m", "15m"];
+const API = "https://www.okx.com/api/v5";
+const TZ = -new Date().getTimezoneOffset() * 60;
+const css = getComputedStyle(document.documentElement);
+const C = k => css.getPropertyValue(k).trim();
+const store = {
+  get(k, d) { try { return localStorage.getItem(k) || d } catch (e) { return d } },
+  set(k, v) { try { localStorage.setItem(k, v) } catch (e) {} }
+};
+
+let inst = store.get("okx.inst", "BTC-USDT");
+let view = store.get("okx.view", "all");
+let ws, pingT, retryT, tickT, gen = 0, pricePrec = 2;
+const panes = {};
+const $ = id => document.getElementById(id);
+
+const isDeriv = () => /-SWAP$|-\d{6}$/.test(inst);
+const volIdx = () => isDeriv() ? 6 : 5;
+const fv = v => v >= 1e9 ? (v / 1e9).toFixed(2) + "B" : v >= 1e6 ? (v / 1e6).toFixed(2) + "M" : v >= 1e3 ? (v / 1e3).toFixed(2) + "K" : v.toFixed(v < 10 ? 4 : 2);
+const fp = v => v.toLocaleString("en-US", { minimumFractionDigits: pricePrec, maximumFractionDigits: pricePrec });
+
+function toBar(r) {
+  const t = Math.floor(+r[0] / 1000) + TZ, o = +r[1], c = +r[4];
+  return [
+    { time: t, open: o, high: +r[2], low: +r[3], close: c },
+    { time: t, value: +r[volIdx()], color: (c >= o ? C("--up") : C("--down")) + "80" }
+  ];
+}
+
+for (const b of BARS) {
+  const el = document.createElement("div");
+  el.className = "pane";
+  el.innerHTML = '<div class="lbl"></div><div class="c"></div>';
+  $("main").appendChild(el);
+  const chart = LightweightCharts.createChart(el.querySelector(".c"), {
+    autoSize: true,
+    layout: { background: { color: C("--bg") }, textColor: C("--muted"), fontSize: 10, attributionLogo: false },
+    grid: { vertLines: { color: C("--line") }, horzLines: { color: C("--line") } },
+    rightPriceScale: { borderColor: C("--line") },
+    timeScale: { borderColor: C("--line"), timeVisible: true, secondsVisible: false, rightOffset: 3 },
+    crosshair: { mode: 0 }
+  });
+  const candle = chart.addCandlestickSeries({
+    upColor: C("--up"), downColor: C("--down"), borderVisible: false,
+    wickUpColor: C("--up"), wickDownColor: C("--down")
+  });
+  candle.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.28 } });
+  const vol = chart.addHistogramSeries({ priceScaleId: "", priceFormat: { type: "volume" }, lastValueVisible: false, priceLineVisible: false });
+  vol.priceScale().applyOptions({ scaleMargins: { top: 0.78, bottom: 0 } });
+  const P = { el, chart, candle, vol, lbl: el.querySelector(".lbl"), last: null, hover: false };
+  chart.subscribeCrosshairMove(p => {
+    const c = p.time && p.seriesData.get(candle), v = p.time && p.seriesData.get(vol);
+    P.hover = !!c;
+    if (c) P.lbl.innerHTML = `<b>${b}</b>시 ${fp(c.open)} 고 ${fp(c.high)} 저 ${fp(c.low)} 종 ${fp(c.close)} · 량 ${v ? fv(v.value) : "-"}`;
+    else showLbl(b);
+  });
+  panes[b] = P;
+}
+
+function showLbl(b) {
+  const P = panes[b], r = P.last;
+  P.lbl.innerHTML = r ? `<b>${b}</b>거래량 ${fv(+r[volIdx()])}` : `<b>${b}</b>`;
+}
+
+function applyView() {
+  document.querySelectorAll("nav button").forEach(x => x.classList.toggle("active", x.dataset.v === view));
+  for (const b of BARS) panes[b].el.classList.toggle("hidden", view !== "all" && view !== b);
+  store.set("okx.view", view);
+}
+
+function setDot(on) { $("dot").classList.toggle("on", on) }
+
+async function getJson(url) {
+  const j = await (await fetch(url)).json();
+  if (j.code !== "0") throw new Error(j.msg || "code " + j.code);
+  return j.data;
+}
+
+async function refreshTicker(g) {
+  try {
+    const t = (await getJson(`${API}/market/ticker?instId=${inst}`))[0];
+    if (g !== gen) return;
+    const last = +t.last, open = +t.open24h, pct = (last - open) / open * 100;
+    $("price").textContent = fp(last);
+    $("chg").textContent = (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%";
+    $("chg").style.color = pct >= 0 ? C("--up") : C("--down");
+  } catch (e) {}
+}
+
+async function load() {
+  const g = ++gen;
+  clearInterval(pingT); clearTimeout(retryT); clearInterval(tickT);
+  if (ws) { ws.onclose = null; ws.close(); ws = null }
+  setDot(false);
+  $("sym").value = inst;
+  document.title = inst;
+  try {
+    const type = /-SWAP$/.test(inst) ? "SWAP" : /-\d{6}$/.test(inst) ? "FUTURES" : "SPOT";
+    const tick = (await getJson(`${API}/public/instruments?instType=${type}&instId=${inst}`))[0].tickSz;
+    pricePrec = (tick.split(".")[1] || "").length;
+    for (const b of BARS) panes[b].candle.applyOptions({ priceFormat: { type: "price", precision: pricePrec, minMove: +tick } });
+    await Promise.all(BARS.map(async b => {
+      const rows = (await getJson(`${API}/market/candles?instId=${inst}&bar=${b}&limit=300`)).slice().reverse();
+      if (g !== gen) return;
+      const P = panes[b], bars = rows.map(toBar);
+      P.candle.setData(bars.map(x => x[0]));
+      P.vol.setData(bars.map(x => x[1]));
+      P.last = rows.at(-1);
+      showLbl(b);
+      P.chart.timeScale().scrollToRealTime();
+    }));
+  } catch (e) {
+    if (g !== gen) return;
+    $("price").textContent = "조회 실패";
+    $("chg").textContent = e.message;
+    $("chg").style.color = C("--muted");
+    retryT = setTimeout(load, 10000);
+    return;
+  }
+  if (g !== gen) return;
+  refreshTicker(g);
+  tickT = setInterval(() => refreshTicker(g), 10000);
+  connect(g);
+}
+
+function connect(g) {
+  const s = new WebSocket("wss://ws.okx.com/ws/v5/business");
+  ws = s;
+  s.onopen = () => {
+    s.send(JSON.stringify({ op: "subscribe", args: BARS.map(b => ({ channel: "candle" + b, instId: inst })) }));
+    setDot(true);
+    pingT = setInterval(() => s.readyState === 1 && s.send("ping"), 20000);
+  };
+  s.onmessage = e => {
+    if (e.data === "pong") return;
+    const m = JSON.parse(e.data);
+    if (!m.data || !m.arg || m.arg.instId !== inst) return;
+    const b = m.arg.channel.slice(6), P = panes[b];
+    if (!P) return;
+    for (const r of m.data) {
+      const [c, v] = toBar(r);
+      try { P.candle.update(c); P.vol.update(v) } catch (err) { continue }
+      P.last = r;
+      if (!P.hover) showLbl(b);
+      if (b === "1m") $("price").textContent = fp(+r[4]);
+    }
+  };
+  s.onclose = () => {
+    setDot(false);
+    clearInterval(pingT);
+    if (g === gen) retryT = setTimeout(load, 3000);
+  };
+  s.onerror = () => s.close();
+}
+
+async function resolveInst(v) {
+  if (v.includes("-")) return v;
+  for (const id of [v + "-USDT", v + "-USDT-SWAP", "X" + v + "-USDT"]) {
+    try { if ((await getJson(`${API}/market/ticker?instId=${id}`)).length) return id } catch (e) {}
+  }
+  return v + "-USDT";
+}
+
+let universe = [], uniP = null, uniAt = 0, sugg = [], selIdx = 0;
+const symEl = $("sym"), suggEl = $("sugg");
+
+function loadUniverse() {
+  if (uniP && Date.now() - uniAt < 300000) return uniP;
+  uniAt = Date.now();
+  uniP = (async () => {
+    const [sp, sw] = await Promise.all(["SPOT", "SWAP"].map(t => getJson(`${API}/market/tickers?instType=${t}`).catch(() => [])));
+    const quote = id => id.split("-")[1] || "";
+    universe = [
+      ...sp.map(t => ({ id: t.instId, type: "현물", last: +t.last, open: +t.open24h, usd: /^USD/.test(quote(t.instId)) ? +t.volCcy24h : 0 })),
+      ...sw.map(t => ({ id: t.instId, type: "무기한", last: +t.last, open: +t.open24h, usd: +t.volCcy24h * +t.last }))
+    ];
+    for (const u of universe) u.base = u.id.split("-")[0];
+    if (!universe.length) uniAt = 0;
+    return universe;
+  })();
+  return uniP;
+}
+
+function search(q) {
+  q = q.trim().toUpperCase();
+  if (!q) return [];
+  const tier = u =>
+    u.id === q ? 0 :
+    u.base === q || u.base === "X" + q ? 1 :
+    u.base.startsWith(q) || u.base.startsWith("X" + q) ? 2 :
+    u.id.includes(q) ? 3 : 9;
+  return universe.map(u => [tier(u), u]).filter(x => x[0] < 9)
+    .sort((a, b) => a[0] - b[0] || b[1].usd - a[1].usd)
+    .slice(0, 15).map(x => x[1]);
+}
+
+function renderSugg(show) {
+  if (!show) { suggEl.classList.remove("open"); return }
+  suggEl.innerHTML = sugg.length ? sugg.map((u, i) => {
+    const pc = u.open ? (u.last - u.open) / u.open * 100 : 0;
+    return `<div class="it${i === selIdx ? " sel" : ""}" data-i="${i}"><span class="id">${u.id}</span><span class="tag">${u.type}</span>` +
+      `<span class="px">${u.last.toLocaleString("en-US", { maximumSignificantDigits: 6 })}</span>` +
+      `<span class="pc" style="color:${pc >= 0 ? C("--up") : C("--down")}">${pc >= 0 ? "+" : ""}${pc.toFixed(2)}%</span></div>`;
+  }).join("") : '<div class="it empty">일치하는 종목 없음</div>';
+  suggEl.classList.add("open");
+}
+
+function closeSugg() { sugg = []; renderSugg(false) }
+
+function pick(id) {
+  inst = id;
+  store.set("okx.inst", inst);
+  closeSugg();
+  symEl.blur();
+  load();
+}
+
+symEl.addEventListener("focus", () => { symEl.select(); loadUniverse() });
+symEl.addEventListener("blur", () => { closeSugg(); symEl.value = inst });
+symEl.addEventListener("input", async () => {
+  await loadUniverse();
+  sugg = search(symEl.value);
+  selIdx = 0;
+  renderSugg(!!symEl.value.trim());
+});
+symEl.addEventListener("keydown", async e => {
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    if (!sugg.length) return;
+    e.preventDefault();
+    selIdx = (selIdx + (e.key === "ArrowDown" ? 1 : -1) + sugg.length) % sugg.length;
+    renderSugg(true);
+    suggEl.children[selIdx]?.scrollIntoView({ block: "nearest" });
+    return;
+  }
+  if (e.key === "Escape") { symEl.blur(); return }
+  if (e.key !== "Enter") return;
+  const v = symEl.value.trim().toUpperCase();
+  if (!v) return;
+  pick(sugg[selIdx]?.id || await resolveInst(v));
+});
+suggEl.addEventListener("mousedown", e => {
+  const it = e.target.closest(".it[data-i]");
+  if (!it) return;
+  e.preventDefault();
+  pick(sugg[+it.dataset.i].id);
+});
+document.querySelectorAll("nav button").forEach(btn => btn.onclick = () => { view = btn.dataset.v; applyView() });
+
+applyView();
+load();
+</script>
+</body>
+</html>
