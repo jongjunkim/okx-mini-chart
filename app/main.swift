@@ -7,6 +7,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pinItem: NSMenuItem!
     private var titleObservation: NSKeyValueObservation?
     private let pinKey = "alwaysOnTop"
+    private let transparencyKey = "windowTransparency"
+    private let transparencyLevels = [0, 10, 20, 30, 40, 50, 60, 70]
+    private var transparencyItems: [NSMenuItem] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         buildMenu()
@@ -41,6 +44,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         applyPin(UserDefaults.standard.bool(forKey: pinKey))
+        setTransparency(UserDefaults.standard.integer(forKey: transparencyKey))
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -59,6 +63,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.level = on ? .floating : .normal
         window.collectionBehavior = on ? [.canJoinAllSpaces, .fullScreenAuxiliary] : []
         pinItem.state = on ? .on : .off
+    }
+
+    @objc private func pickTransparency(_ sender: NSMenuItem) { setTransparency(sender.tag) }
+    @objc private func moreTransparent() { stepTransparency(1) }
+    @objc private func lessTransparent() { stepTransparency(-1) }
+
+    private func stepTransparency(_ delta: Int) {
+        let current = transparencyLevels.firstIndex(of: UserDefaults.standard.integer(forKey: transparencyKey)) ?? 0
+        let next = min(max(current + delta, 0), transparencyLevels.count - 1)
+        setTransparency(transparencyLevels[next])
+    }
+
+    private func setTransparency(_ percent: Int) {
+        let value = transparencyLevels.contains(percent) ? percent : 0
+        UserDefaults.standard.set(value, forKey: transparencyKey)
+        window.alphaValue = CGFloat(100 - value) / 100
+        for item in transparencyItems { item.state = item.tag == value ? .on : .off }
     }
 
     private func buildMenu() {
@@ -87,6 +108,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         pinItem = NSMenuItem(title: "항상 위에 표시", action: #selector(togglePin), keyEquivalent: "t")
         pinItem.target = self
         view.addItem(pinItem)
+        view.addItem(.separator())
+        let transparency = NSMenu(title: "창 투명도")
+        for level in transparencyLevels {
+            let item = NSMenuItem(title: level == 0 ? "0% (불투명)" : "\(level)%", action: #selector(pickTransparency(_:)), keyEquivalent: "")
+            item.tag = level
+            item.target = self
+            transparency.addItem(item)
+            transparencyItems.append(item)
+        }
+        transparency.addItem(.separator())
+        let more = NSMenuItem(title: "더 투명하게", action: #selector(moreTransparent), keyEquivalent: "-")
+        more.keyEquivalentModifierMask = [.command, .option]
+        more.target = self
+        transparency.addItem(more)
+        let less = NSMenuItem(title: "덜 투명하게", action: #selector(lessTransparent), keyEquivalent: "=")
+        less.keyEquivalentModifierMask = [.command, .option]
+        less.target = self
+        transparency.addItem(less)
+        let transparencyItem = NSMenuItem(title: "창 투명도", action: nil, keyEquivalent: "")
+        transparencyItem.submenu = transparency
+        view.addItem(transparencyItem)
         addSubmenu(view, to: main)
 
         let win = NSMenu(title: "윈도우")
