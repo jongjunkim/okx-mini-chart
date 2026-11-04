@@ -125,7 +125,7 @@ main{flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto}
 </head>
 <body>
 <nav>
-  <button class="tool" data-mode="h" title="수평선(지지·저항): 누른 뒤 차트를 클릭">수평</button><button class="tool" data-mode="t" title="추세선: 누른 뒤 두 점을 클릭">추세</button><button class="tool" data-mode="r" title="가격 범위: 누른 뒤 두 점을 클릭하면 가격 차이·변동률·봉 수를 보여줍니다">범위</button><button class="tool" data-mode="L" title="롱 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">롱</button><button class="tool" data-mode="S" title="숏 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">숏</button><button id="indBtn" title="이동평균·볼린저밴드">지표</button><button id="topBtn" title="24시간 거래대금 상위 10종목. 누르면 선택한 칸에 띄웁니다">TOP10</button><button id="shotBtn" title="화면 캡처(⌘S): 바탕화면에 저장하고 클립보드에도 복사합니다">캡처</button><button id="alBtn" title="이동평균 정배열·우상향 알림"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>알림<span id="alBadge"></span></button>
+  <button class="tool" data-mode="h" title="수평선(지지·저항): 누른 뒤 차트를 클릭">수평</button><button class="tool" data-mode="t" title="추세선: 누른 뒤 두 점을 클릭">추세</button><button class="tool" data-mode="r" title="가격 범위: 누른 뒤 두 점을 클릭하면 가격 차이·변동률·봉 수를 보여줍니다">범위</button><button class="tool" data-mode="L" title="롱 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">롱</button><button class="tool" data-mode="S" title="숏 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">숏</button><button id="indBtn" title="이동평균·볼린저밴드·RSI">지표</button><button id="topBtn" title="24시간 거래대금 상위 10종목. 누르면 선택한 칸에 띄웁니다">TOP10</button><button id="shotBtn" title="화면 캡처(⌘S): 바탕화면에 저장하고 클립보드에도 복사합니다">캡처</button><button id="alBtn" title="이동평균 정배열·우상향 알림"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>알림<span id="alBadge"></span></button>
   <span id="dot" title="실시간 연결"></span>
   <div id="indp"></div>
   <div id="topp"></div>
@@ -147,6 +147,7 @@ const css = getComputedStyle(document.documentElement);
 const C = k => css.getPropertyValue(k).trim();
 const MA_COLORS = ["#f5c542", "#c77dff", "#2ec4b6", "#ff8c42"];
 const BB_COLOR = "#8a94a6";
+const RSI_COLOR = "#e879f9";
 const PROFIT = "#26a69a", LOSS = "#ef5350", ENTRY = "#9aa3af";
 const TWO_CLICK = ["t", "r"];
 const store = {
@@ -163,8 +164,10 @@ let ind = (() => {
     bb: { on: false, n: 20, k: 2 }
   };
 })();
+ind.rsi = ind.rsi || { on: false, n: 14 };
 const maColor = k => ind.ma[k].color || MA_COLORS[k];
 const bbColor = () => ind.bb.color || BB_COLOR;
+const rsiColor = () => ind.rsi.color || RSI_COLOR;
 
 let slots = [], activeSlot = null, nextId = 1;
 let mode = null, pending = null, preview = null, selected = null, selectedInst = null, drag = null;
@@ -237,6 +240,18 @@ function bollinger(cl, n, k) {
     up.push(mid[i] + k * sd); lo.push(mid[i] - k * sd);
   }
   return [up, mid, lo];
+}
+
+function rsi(cl, n) {
+  const out = new Array(cl.length).fill(null);
+  let g = 0, l = 0;
+  for (let i = 1; i < cl.length; i++) {
+    const d = cl[i] - cl[i - 1], up = d > 0 ? d : 0, dn = d < 0 ? -d : 0;
+    if (i <= n) { g += up; l += dn; if (i < n) continue; g /= n; l /= n }
+    else { g = (g * (n - 1) + up) / n; l = (l * (n - 1) + dn) / n }
+    out[i] = l === 0 ? (g === 0 ? 50 : 100) : 100 - 100 / (1 + g / l);
+  }
+  return out;
 }
 
 function idxOfTime(bars, t) {
@@ -459,9 +474,13 @@ function makeSlot(cfg, beforeEl) {
   S.candle = S.chart.addCandlestickSeries({
     upColor: C("--up"), downColor: C("--down"), borderVisible: false, wickUpColor: C("--up"), wickDownColor: C("--down")
   });
-  S.candle.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.28 } });
   S.vol = S.chart.addHistogramSeries({ priceScaleId: "", priceFormat: { type: "volume" }, lastValueVisible: false, priceLineVisible: false });
-  S.vol.priceScale().applyOptions({ scaleMargins: { top: 0.78, bottom: 0 } });
+  S.rsi = S.chart.addLineSeries({
+    ...lineOpts(rsiColor()), priceScaleId: "rsi", priceFormat: { type: "price", precision: 2, minMove: 0.01 },
+    autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } })
+  });
+  [70, 50, 30].forEach(v => S.rsi.createPriceLine({ price: v, color: v === 50 ? "#3a414d" : "#5a6270", lineWidth: 1, lineStyle: 2, axisLabelVisible: false }));
+  applyMargins(S);
   S.ma = MA_COLORS.map((_, k) => S.chart.addLineSeries(lineOpts(maColor(k))));
   S.bbs = [0, 1, 2].map(i => S.chart.addLineSeries({ ...lineOpts(bbColor()), lineStyle: i === 1 ? 2 : 0 }));
   S.layer = new DrawLayer(S);
@@ -496,6 +515,14 @@ function makeSlot(cfg, beforeEl) {
   return S;
 }
 
+function applyMargins(S) {
+  const on = ind.rsi.on;
+  S.candle.priceScale().applyOptions({ scaleMargins: on ? { top: 0.06, bottom: 0.45 } : { top: 0.08, bottom: 0.28 } });
+  S.vol.priceScale().applyOptions({ scaleMargins: on ? { top: 0.6, bottom: 0.3 } : { top: 0.78, bottom: 0 } });
+  S.rsi.priceScale().applyOptions({ scaleMargins: { top: 0.74, bottom: 0.03 } });
+  S.rsi.applyOptions({ visible: on });
+}
+
 function renderLbl(S, i, text) {
   const parts = [];
   ind.ma.forEach((m, k) => {
@@ -506,6 +533,10 @@ function renderLbl(S, i, text) {
   if (ind.bb.on) {
     const u = S.ind?.bb?.[0][i], l = S.ind?.bb?.[2][i];
     parts.push(`<span style="color:${bbColor()}">BB ${u == null ? "-" : fmt(S, u)} / ${l == null ? "-" : fmt(S, l)}</span>`);
+  }
+  if (ind.rsi.on) {
+    const v = S.ind?.rsi?.[i];
+    parts.push(`<span style="color:${rsiColor()}">RSI${ind.rsi.n} ${v == null ? "-" : v.toFixed(2)}</span>`);
   }
   S.lbl.innerHTML = `<div><b>${S.tf}</b>${text}</div>` + (parts.length ? `<div class="ind">${parts.join("")}</div>` : "");
 }
@@ -518,7 +549,8 @@ function paintInd(S, full) {
   const cl = S.bars.map(x => x.close), vl = S.vols.map(x => x.value);
   S.ind = {
     ma: ind.ma.map(m => !m.on ? null : m.type === "EMA" ? ema(cl, m.n) : m.type === "VWMA" ? vwma(cl, vl, m.n) : sma(cl, m.n)),
-    bb: ind.bb.on ? bollinger(cl, ind.bb.n, ind.bb.k) : null
+    bb: ind.bb.on ? bollinger(cl, ind.bb.n, ind.bb.k) : null,
+    rsi: ind.rsi.on ? rsi(cl, ind.rsi.n) : null
   };
   const n = S.bars.length;
   const pt = (arr, j) => arr[j] == null ? { time: S.bars[j].time } : { time: S.bars[j].time, value: arr[j] };
@@ -529,6 +561,7 @@ function paintInd(S, full) {
   };
   S.ma.forEach((s, k) => apply(s, S.ind.ma[k]));
   S.bbs.forEach((s, k) => apply(s, S.ind.bb && S.ind.bb[k]));
+  apply(S.rsi, S.ind.rsi);
 }
 
 function drawSpark(S) {
@@ -560,7 +593,7 @@ function setChange(S, last, open) {
 function resetSeries(S) {
   S.bars = []; S.vols = []; S.last = null; S.ready = false;
   S.candle.setData([]); S.vol.setData([]); S.candle.setMarkers([]);
-  S.ma.forEach(s => s.setData([])); S.bbs.forEach(s => s.setData([]));
+  S.ma.forEach(s => s.setData([])); S.bbs.forEach(s => s.setData([])); S.rsi.setData([]);
   S.candle.priceScale().applyOptions({ autoScale: true });
 }
 
@@ -1158,6 +1191,8 @@ function buildIndPanel() {
     `<select data-f="type" data-k="${k}">${sel(m.type)}</select><input type="number" min="1" max="300" data-f="n" data-k="${k}" value="${m.n}"></div>`).join("") +
     `<div class="row"><label><input type="checkbox" data-f="bbon"${ind.bb.on ? " checked" : ""}></label><input type="color" data-f="bbcolor" value="${bbColor()}" title="선 색">` +
     `<span class="nm">볼린저</span><input type="number" min="2" max="300" data-f="bbn" value="${ind.bb.n}" title="기간"><input type="number" min="0.5" max="5" step="0.5" data-f="bbk" value="${ind.bb.k}" title="표준편차 배수"></div>` +
+    `<div class="row"><label><input type="checkbox" data-f="rsion"${ind.rsi.on ? " checked" : ""}></label><input type="color" data-f="rsicolor" value="${rsiColor()}" title="선 색">` +
+    `<span class="nm">RSI</span><input type="number" min="2" max="100" data-f="rsin" value="${ind.rsi.n}" title="기간"></div>` +
     `<div class="foot"><button id="clrDraw"></button></div>`;
   updateClearBtn();
 }
@@ -1177,11 +1212,13 @@ function onColor(e) {
   const t = e.target, f = t.dataset.f;
   if (f === "color") ind.ma[+t.dataset.k].color = t.value;
   else if (f === "bbcolor") ind.bb.color = t.value;
+  else if (f === "rsicolor") ind.rsi.color = t.value;
   else return false;
   store.set("okx.ind", JSON.stringify(ind));
   for (const S of slots) {
     S.ma.forEach((s, k) => s.applyOptions({ color: maColor(k) }));
     S.bbs.forEach(s => s.applyOptions({ color: bbColor() }));
+    S.rsi.applyOptions({ color: rsiColor() });
     if (!S.hover) showLbl(S);
   }
   return true;
@@ -1198,9 +1235,11 @@ indp.addEventListener("change", e => {
   else if (f === "bbon") ind.bb.on = t.checked;
   else if (f === "bbn") t.value = ind.bb.n = clampInt(t.value, 2, 300, ind.bb.n);
   else if (f === "bbk") { const v = +t.value; t.value = ind.bb.k = Number.isFinite(v) ? Math.max(0.5, Math.min(5, v)) : ind.bb.k }
+  else if (f === "rsion") ind.rsi.on = t.checked;
+  else if (f === "rsin") t.value = ind.rsi.n = clampInt(t.value, 2, 100, ind.rsi.n);
   else return;
   store.set("okx.ind", JSON.stringify(ind));
-  for (const S of slots) { paintInd(S, true); if (!S.hover) showLbl(S) }
+  for (const S of slots) { applyMargins(S); paintInd(S, true); if (!S.hover) showLbl(S) }
   topUpWatchers();
 });
 
