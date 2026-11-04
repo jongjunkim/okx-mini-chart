@@ -121,11 +121,26 @@ main{flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto}
 .bell{display:none;align-items:center;color:var(--draw);flex:none;margin-left:auto}
 .slot.watched .bell{display:flex}
 .slot.watched .tf{margin-left:0}
+.rpb{display:none;align-items:center;gap:4px;padding:3px 8px;background:#1a1710;border-top:1px solid #3a321c;border-bottom:1px solid #3a321c;flex:none;flex-wrap:wrap}
+.slot.replay .rpb{display:flex}
+.slot.collapsed .rpb{display:none}
+.rpb .rpt{color:var(--draw);font-weight:600;margin-right:2px}
+.rpb button,.rpb select,.rpb input{background:var(--panel);border:1px solid var(--line);color:var(--muted);padding:2px 7px;border-radius:4px;font:inherit;cursor:pointer;white-space:nowrap}
+.rpb input{background:var(--bg);color:var(--text);cursor:text;padding:1px 4px;color-scheme:dark}
+.rpb button:hover,.rpb select:hover{color:var(--text)}
+.rpb button.on{color:var(--draw);border-color:var(--draw)}
+.rpb .rpp{min-width:58px}
+.rpb .rpa{margin-left:auto;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap}
+.rpb [data-rp=end]{color:var(--text)}
+.cut{position:absolute;top:0;bottom:0;z-index:2;pointer-events:none;display:none;background:#e0b34112;border-left:1.5px dashed var(--draw)}
+.cut b{position:absolute;top:36px;left:6px;background:var(--draw);color:var(--bg);font-size:11px;font-weight:600;padding:1px 6px;border-radius:3px;white-space:nowrap}
+.cut.flip b{left:auto;right:calc(100% + 6px)}
+.slot.cutting .cut{display:block}
 </style>
 </head>
 <body>
 <nav>
-  <button class="tool" data-mode="h" title="수평선(지지·저항): 누른 뒤 차트를 클릭">수평</button><button class="tool" data-mode="t" title="추세선: 누른 뒤 두 점을 클릭">추세</button><button class="tool" data-mode="r" title="가격 범위: 누른 뒤 두 점을 클릭하면 가격 차이·변동률·봉 수를 보여줍니다">범위</button><button class="tool" data-mode="L" title="롱 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">롱</button><button class="tool" data-mode="S" title="숏 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">숏</button><button id="indBtn" title="이동평균·볼린저밴드·RSI">지표</button><button id="topBtn" title="24시간 거래대금 상위 10종목. 누르면 선택한 칸에 띄웁니다">TOP10</button><button id="shotBtn" title="화면 캡처(⌘S): 바탕화면에 저장하고 클립보드에도 복사합니다">캡처</button><button id="alBtn" title="이동평균 정배열·우상향 알림"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>알림<span id="alBadge"></span></button>
+  <button class="tool" data-mode="h" title="수평선(지지·저항): 누른 뒤 차트를 클릭">수평</button><button class="tool" data-mode="t" title="추세선: 누른 뒤 두 점을 클릭">추세</button><button class="tool" data-mode="r" title="가격 범위: 누른 뒤 두 점을 클릭하면 가격 차이·변동률·봉 수를 보여줍니다">범위</button><button class="tool" data-mode="L" title="롱 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">롱</button><button class="tool" data-mode="S" title="숏 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">숏</button><button class="tool" data-mode="P" title="리플레이: 누른 뒤 시작할 봉을 클릭. 그 봉까지만 보이고 한 봉씩 넘겨 봅니다">리플레이</button><button id="indBtn" title="이동평균·볼린저밴드·RSI">지표</button><button id="topBtn" title="24시간 거래대금 상위 10종목. 누르면 선택한 칸에 띄웁니다">TOP10</button><button id="shotBtn" title="화면 캡처(⌘S): 바탕화면에 저장하고 클립보드에도 복사합니다">캡처</button><button id="alBtn" title="이동평균 정배열·우상향 알림"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>알림<span id="alBadge"></span></button>
   <span id="dot" title="실시간 연결"></span>
   <div id="indp"></div>
   <div id="topp"></div>
@@ -150,6 +165,7 @@ const BB_COLOR = "#8a94a6";
 const RSI_COLOR = "#e879f9";
 const PROFIT = "#26a69a", LOSS = "#ef5350", ENTRY = "#9aa3af";
 const TWO_CLICK = ["t", "r"];
+const RP_SPEEDS = [[1000, "초당 1봉"], [333, "초당 3봉"], [100, "초당 10봉"]];
 const store = {
   get(k, d) { try { return localStorage.getItem(k) || d } catch (e) { return d } },
   set(k, v) { try { localStorage.setItem(k, v) } catch (e) {} }
@@ -446,7 +462,7 @@ function makeSlot(cfg, beforeEl) {
   const S = {
     id: nextId++, inst: cfg.inst || null, tf: BARS.includes(cfg.tf) ? cfg.tf : "15m", collapsed: !!cfg.collapsed, w: cfg.w || NEW_PANE_H,
     bars: [], vols: [], ind: null, hlines: [], last: null, hover: false, loadingOld: false, noMore: false, gen: 0, prec: 2, ready: false,
-    sugg: [], selIdx: 0, retryT: null
+    sugg: [], selIdx: 0, retryT: null, rp: null
   };
   const el = document.createElement("section");
   el.className = "slot";
@@ -456,11 +472,17 @@ function makeSlot(cfg, beforeEl) {
     `<span class="bell"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></span>` +
     `<select class="tf" title="봉 간격">${BARS.map(b => `<option value="${b}">${b}</option>`).join("")}</select>` +
     `<button class="ic col" title="접기"></button><button class="ic cls" title="닫기">×</button><div class="sugg"></div></div>` +
-    `<div class="pane"><div class="lbl"></div><div class="c"></div><div class="empty">종목을 고르면 여기에 차트가 나와요</div></div>`;
+    `<div class="rpb"><span class="rpt">리플레이</span><button data-rp="pick" title="다른 시작점 고르기">✂ 시작점</button>` +
+    `<input type="datetime-local" class="rpd" title="이 시각부터 다시 시작">` +
+    `<button data-rp="play" class="rpp" title="재생·멈춤 (Space)">▶ 재생</button><button data-rp="step" title="한 봉 앞으로 (Shift+→)">한 봉 ▷</button>` +
+    `<select class="rps" title="재생 속도">${RP_SPEEDS.map(([v, t]) => `<option value="${v}">${t}</option>`).join("")}</select>` +
+    `<span class="rpa"></span><button data-rp="end" title="실시간으로 돌아가기">끝내기</button></div>` +
+    `<div class="pane"><div class="lbl"></div><div class="c"></div><div class="cut"><b></b></div><div class="empty">종목을 고르면 여기에 차트가 나와요</div></div>`;
   Object.assign(S, {
     el, symEl: el.querySelector(".sym"), pxEl: el.querySelector(".px"), pcEl: el.querySelector(".pc"), spark: el.querySelector(".spark"),
     tfEl: el.querySelector(".tf"), bellEl: el.querySelector(".bell"), colBtn: el.querySelector(".col"), suggEl: el.querySelector(".sugg"),
-    pane: el.querySelector(".pane"), lbl: el.querySelector(".lbl"), box: el.querySelector(".c")
+    pane: el.querySelector(".pane"), lbl: el.querySelector(".lbl"), box: el.querySelector(".c"),
+    cutEl: el.querySelector(".cut"), rpDate: el.querySelector(".rpd"), rpPlay: el.querySelector(".rpp"), rpSpeedEl: el.querySelector(".rps"), rpAt: el.querySelector(".rpa")
   });
   S.tfEl.value = S.tf;
   S.chart = LightweightCharts.createChart(S.box, {
@@ -472,7 +494,13 @@ function makeSlot(cfg, beforeEl) {
     crosshair: { mode: 0 }
   });
   S.candle = S.chart.addCandlestickSeries({
-    upColor: C("--up"), downColor: C("--down"), borderVisible: false, wickUpColor: C("--up"), wickDownColor: C("--down")
+    upColor: C("--up"), downColor: C("--down"), borderVisible: false, wickUpColor: C("--up"), wickDownColor: C("--down"),
+    autoscaleInfoProvider: orig => {
+      const o = orig(), f = S.rpFreeze;
+      if (!f) return o;
+      if (!o) return { priceRange: { ...f } };
+      return { ...o, priceRange: { minValue: Math.min(f.minValue, o.priceRange.minValue), maxValue: Math.max(f.maxValue, o.priceRange.maxValue) } };
+    }
   });
   S.vol = S.chart.addHistogramSeries({ priceScaleId: "", priceFormat: { type: "volume" }, lastValueVisible: false, priceLineVisible: false });
   S.rsi = S.chart.addLineSeries({
@@ -493,11 +521,16 @@ function makeSlot(cfg, beforeEl) {
     if (c) renderLbl(S, idxOfTime(S.bars, p.time), `시 ${fmt(S, c.open)} 고 ${fmt(S, c.high)} 저 ${fmt(S, c.low)} 종 ${fmt(S, c.close)} · 량 ${v ? fv(v.value) : "-"}`);
     else showLbl(S);
     if (TWO_CLICK.includes(mode) && pending && pending.inst === S.inst && p.point) { preview = pointToTP(S, p.point) || preview; repaint(S.inst) }
+    if (mode === "P") moveCut(S, p.point);
   });
   S.chart.subscribeClick(p => onChartClick(S, p));
   S.box.addEventListener("pointerdown", e => onPointerDown(S, e), true);
   S.box.addEventListener("mousedown", e => { if (drag) e.stopPropagation() }, true);
-  S.box.addEventListener("pointermove", e => { if (!drag && !mode) setHoverCursor(S, e) });
+  S.box.addEventListener("pointermove", e => {
+    if (!drag && !mode) setHoverCursor(S, e);
+    if (e.buttons === 1 && !drag && !mode) S.rpFreeze = null;
+  });
+  S.box.addEventListener("wheel", () => { S.rpFreeze = null }, { passive: true });
   el.addEventListener("pointerdown", () => { activeSlot = S; updateClearBtn() }, true);
 
   wireSymbolInput(S);
@@ -505,9 +538,10 @@ function makeSlot(cfg, beforeEl) {
     S.tf = S.tfEl.value;
     S.chart.applyOptions({ timeScale: { timeVisible: S.tf !== "1d" } });
     saveSlots();
-    loadSlot(S);
+    if (S.rp) replayFrom(S, S.rp.T); else loadSlot(S);
     syncSubs();
   });
+  wireReplayBar(S);
   S.colBtn.addEventListener("click", () => setCollapsed(S, !S.collapsed));
   el.querySelector(".cls").addEventListener("click", () => closeSlot(S));
 
@@ -542,7 +576,8 @@ function renderLbl(S, i, text) {
 }
 
 function showLbl(S) {
-  renderLbl(S, S.bars.length - 1, S.last ? `거래량 ${fv(+S.last[volIdx(S.inst)])}` : "");
+  const v = S.rp ? S.vols.at(-1)?.value : S.last ? +S.last[volIdx(S.inst)] : null;
+  renderLbl(S, S.bars.length - 1, v != null ? `거래량 ${fv(v)}` : "");
 }
 
 function paintInd(S, full) {
@@ -591,7 +626,7 @@ function setChange(S, last, open) {
 }
 
 function resetSeries(S) {
-  S.bars = []; S.vols = []; S.last = null; S.ready = false;
+  S.bars = []; S.vols = []; S.last = null; S.ready = false; S.rpFreeze = null;
   S.candle.setData([]); S.vol.setData([]); S.candle.setMarkers([]);
   S.ma.forEach(s => s.setData([])); S.bbs.forEach(s => s.setData([])); S.rsi.setData([]);
   S.candle.priceScale().applyOptions({ autoScale: true });
@@ -600,6 +635,7 @@ function resetSeries(S) {
 async function loadSlot(S) {
   const g = ++S.gen;
   clearTimeout(S.retryT);
+  if (S.rp) { rpPause(S); S.rp = null; setRpUi(S, false) }
   S.noMore = false; S.loadingOld = false;
   S.symEl.value = S.inst || "";
   S.el.classList.toggle("blank", !S.inst);
@@ -660,6 +696,10 @@ async function loadOlder(S, g) {
     const add = rows.map(r => toBar(r, S.inst)).filter(x => x[0].time < S.bars[0].time);
     if (!add.length) { S.noMore = true; return }
     const range = S.chart.timeScale().getVisibleLogicalRange();
+    if (S.rp) {
+      S.rp.bars = add.map(x => x[0]).concat(S.rp.bars);
+      S.rp.vols = add.map(x => x[1]).concat(S.rp.vols);
+    }
     S.bars = add.map(x => x[0]).concat(S.bars);
     S.vols = add.map(x => x[1]).concat(S.vols);
     S.candle.setData(S.bars);
@@ -679,7 +719,7 @@ async function refreshTicker(only) {
   for (const inst of insts) {
     try {
       const t = (await getJson(`${API}/market/ticker?instId=${inst}`))[0];
-      for (const S of slotsOf(inst)) { setPriceText(S, +t.last); setChange(S, +t.last, +t.open24h) }
+      for (const S of slotsOf(inst)) if (!S.rp) { setPriceText(S, +t.last); setChange(S, +t.last, +t.open24h) }
     } catch (e) {}
   }
 }
@@ -720,7 +760,7 @@ function connect() {
     if (!m.data || !m.arg) return;
     const tf = BAR_OF[m.arg.channel.slice(6)], inst = m.arg.instId;
     for (const S of slots) {
-      if (S.inst !== inst || S.tf !== tf || !S.ready) continue;
+      if (S.inst !== inst || S.tf !== tf || !S.ready || S.rp) continue;
       for (const r of m.data) {
         const [c, v] = toBar(r, inst);
         try { S.candle.update(c); S.vol.update(v) } catch (err) { continue }
@@ -732,7 +772,7 @@ function connect() {
         drawSpark(S);
       }
     }
-    for (const T of slotsOf(inst)) if (T.ready) setPriceText(T, +m.data.at(-1)[4]);
+    for (const T of slotsOf(inst)) if (T.ready && !T.rp) setPriceText(T, +m.data.at(-1)[4]);
     const W = watchers.get(`${tf}|${inst}`);
     if (W && W.ready) for (const r of m.data) onWatchBar(W, r);
   };
@@ -741,7 +781,7 @@ function connect() {
     setDot(false);
     clearInterval(pingT);
     ws = null;
-    reconnectT = setTimeout(() => { slots.forEach(loadSlot); connect() }, 3000);
+    reconnectT = setTimeout(() => { slots.forEach(S => { if (!S.rp) loadSlot(S) }); connect() }, 3000);
   };
   s.onerror = () => s.close();
 }
@@ -846,6 +886,8 @@ function closeSlot(S) {
   slots.splice(i, 1);
   S.gen++;
   clearTimeout(S.retryT);
+  rpPause(S);
+  S.rp = null;
   if (selectedInst === S.inst && !slotsOf(S.inst).length) select(null);
   if (pending && pending.inst === S.inst && !slotsOf(S.inst).length) setMode(null);
   S.chart.remove();
@@ -919,6 +961,7 @@ const HINTS = {
   r: "가격 범위: 시작점과 끝점을 차례로 클릭하세요 · Esc 취소",
   L: "롱 포지션: 진입가를 클릭하세요 · 생긴 뒤 목표·손절선을 끌어 조정 · Esc 취소",
   S: "숏 포지션: 진입가를 클릭하세요 · 생긴 뒤 목표·손절선을 끌어 조정 · Esc 취소",
+  P: "리플레이: 시작할 봉을 클릭하세요 · 그 봉까지만 보이고 뒤는 가려집니다 · Esc 취소",
   sel: "선택됨: 끌어서 조정하고 Backspace 로 지웁니다 · Esc 선택 해제"
 };
 
@@ -931,6 +974,8 @@ function updateHint() {
 function setMode(m) {
   mode = m; pending = null; preview = null;
   if (m) { selected = null; selectedInst = null }
+  if (m !== "P") slots.forEach(x => x.el.classList.remove("cutting"));
+  document.querySelectorAll(".rpb [data-rp=pick]").forEach(x => x.classList.toggle("on", m === "P"));
   document.body.classList.toggle("drawing", !!m);
   document.querySelectorAll(".tool[data-mode]").forEach(x => x.classList.toggle("active", x.dataset.mode === m));
   updateHint();
@@ -1059,6 +1104,7 @@ function newPosition(S, type, tp) {
 
 function onChartClick(S, param) {
   if (!mode || !param.point || !S.ready) return;
+  if (mode === "P") { rpStartAt(S, param.point.x); setMode(null); return }
   const tp = pointToTP(S, param.point);
   if (!tp) return;
   let d;
@@ -1076,6 +1122,228 @@ function onChartClick(S, param) {
   saveDrawings(S.inst);
   setMode(null);
   select(d, S.inst);
+}
+
+let rpSpeed = RP_SPEEDS.some(([v]) => v === +store.get("okx.rp.speed", "")) ? +store.get("okx.rp.speed", "") : 333;
+const nowSec = () => Date.now() / 1000;
+const closeOf = (S, b) => b.time - TZ + SEC[S.tf];
+
+function rpStamp(sec) {
+  const d = new Date(sec * 1000), y = d.getFullYear() !== new Date().getFullYear() ? d.getFullYear() + "/" : "";
+  return `${y}${d.getMonth() + 1}/${d.getDate()} ${hm(sec * 1000)}`;
+}
+
+function toInput(sec) {
+  const d = new Date(sec * 1000), p = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function rpTarget() {
+  return activeSlot?.rp && slots.includes(activeSlot) ? activeSlot : slots.find(x => x.rp) || null;
+}
+
+function setRpUi(S, on) {
+  S.el.classList.toggle("replay", on);
+  S.chart.applyOptions({ timeScale: { shiftVisibleRangeOnNewBar: !on } });
+  if (!on) S.rpAt.textContent = "";
+}
+
+function rpPickAt(S, x) {
+  const lg = S.chart.timeScale().coordinateToLogical(x);
+  if (lg == null) return null;
+  const base = S.rp ? S.rp.bars : S.bars, vb = S.rp ? S.rp.vols : S.vols;
+  let n = base.length;
+  while (n && closeOf(S, base[n - 1]) > nowSec()) n--;
+  if (!n) return null;
+  return { base, vb, n, i: Math.max(0, Math.min(n - 1, Math.round(lg))) };
+}
+
+function moveCut(S, pt) {
+  slots.forEach(x => { if (x !== S) x.el.classList.remove("cutting") });
+  const k = pt && S.ready ? rpPickAt(S, pt.x) : null;
+  S.el.classList.toggle("cutting", !!k);
+  if (!k) return;
+  const ts = S.chart.timeScale(), c0 = ts.logicalToCoordinate(k.i), c1 = ts.logicalToCoordinate(k.i + 1);
+  const x = c0 == null || c1 == null ? pt.x : (c0 + c1) / 2, w = Math.max(0, (S.layer.width || S.box.clientWidth) - x);
+  S.cutEl.style.left = x + "px";
+  S.cutEl.style.width = w + "px";
+  S.cutEl.classList.toggle("flip", w < 170);
+  S.cutEl.firstChild.textContent = `여기서 자르기 · ${rpStamp(closeOf(S, k.base[k.i]))}`;
+}
+
+function rpShow(S, keep) {
+  const range = keep ? S.chart.timeScale().getVisibleLogicalRange() : null;
+  if (keep) {
+    const h = S.chart.paneSize().height, m = S.candle.priceScale().options().scaleMargins;
+    const hi = S.candle.coordinateToPrice(h * m.top), lo = S.candle.coordinateToPrice(h * (1 - m.bottom));
+    S.rpFreeze = hi != null && lo != null ? { minValue: lo, maxValue: hi } : null;
+  } else S.candle.priceScale().applyOptions({ autoScale: true });
+  S.candle.setData(S.bars);
+  S.vol.setData(S.vols);
+  paintInd(S, true);
+  updateMarkers(S);
+  setRpUi(S, true);
+  rpStatus(S);
+  showLbl(S);
+  if (range) S.chart.timeScale().setVisibleLogicalRange(range);
+  else S.chart.timeScale().scrollToRealTime();
+  syncDrawings(S.inst);
+}
+
+function rpStartAt(S, x) {
+  const k = rpPickAt(S, x);
+  if (!k) return;
+  rpPause(S);
+  const R = S.rp = { T: closeOf(S, k.base[k.i]), bars: k.base.slice(0, k.n), vols: k.vb.slice(0, k.n), fwdDone: false, fwdLoading: false, playT: null };
+  S.bars = R.bars.slice(0, k.i + 1);
+  S.vols = R.vols.slice(0, k.i + 1);
+  rpShow(S, true);
+}
+
+async function replayFrom(S, T) {
+  if (!S.inst) return;
+  T = Math.floor(Math.min(T, nowSec()));
+  rpPause(S);
+  const g = ++S.gen;
+  clearTimeout(S.retryT);
+  S.noMore = false; S.loadingOld = false;
+  resetSeries(S);
+  const R = S.rp = { T, bars: [], vols: [], fwdDone: false, fwdLoading: false, playT: null };
+  setRpUi(S, true);
+  rpStatus(S);
+  S.rpAt.textContent = "불러오는 중…";
+  try {
+    let rows = [], after = T * 1000 - SEC[S.tf] * 1000 + 1;
+    while (rows.length < WARMUP_BARS) {
+      const page = await getJson(`${API}/market/history-candles?instId=${S.inst}&bar=${OKX_BAR[S.tf]}&after=${after}&limit=300`);
+      if (g !== S.gen) return;
+      if (!page.length) break;
+      rows = page.slice().reverse().concat(rows);
+      after = +page.at(-1)[0];
+      await new Promise(r => setTimeout(r, 150));
+    }
+    if (g !== S.gen) return;
+    if (!rows.length) throw new Error(`${rpStamp(T)} 이전 봉이 없어요`);
+    const bars = rows.map(r => toBar(r, S.inst));
+    R.bars = bars.map(x => x[0]);
+    R.vols = bars.map(x => x[1]);
+    S.bars = R.bars.slice();
+    S.vols = R.vols.slice();
+    S.ready = true;
+    rpShow(S);
+    rpFetchForward(S);
+  } catch (e) {
+    if (g !== S.gen) return;
+    showToast(`리플레이 봉을 받지 못했어요 · ${e.message}`, false);
+    loadSlot(S);
+  }
+}
+
+async function rpFetchForward(S) {
+  const R = S.rp, g = S.gen;
+  if (!R || R.fwdLoading || R.fwdDone || !R.bars.length || Date.now() - (R.fwdErrAt || 0) < 3000) return;
+  R.fwdLoading = true;
+  try {
+    const iv = SEC[S.tf] * 1000, from = (R.bars.at(-1).time - TZ) * 1000;
+    const rows = (await getJson(`${API}/market/history-candles?instId=${S.inst}&bar=${OKX_BAR[S.tf]}&after=${from + 301 * iv}&before=${from}&limit=300`)).slice().reverse();
+    if (g !== S.gen || S.rp !== R) return;
+    const add = rows.map(r => toBar(r, S.inst)).filter(x => x[0].time > R.bars.at(-1).time && closeOf(S, x[0]) <= nowSec());
+    if (!add.length) { R.fwdDone = true; return }
+    R.bars.push(...add.map(x => x[0]));
+    R.vols.push(...add.map(x => x[1]));
+  } catch (e) {
+    R.fwdErrAt = Date.now();
+  } finally {
+    R.fwdLoading = false;
+  }
+}
+
+function rpStep(S) {
+  const R = S.rp;
+  if (!R || !S.ready) return false;
+  const i = S.bars.length;
+  if (R.bars.length - i < 150) rpFetchForward(S);
+  const b = R.bars[i];
+  if (!b) {
+    if (R.fwdDone) { rpPause(S); showToast("지금 봉까지 왔어요 · 끝내기를 누르면 실시간으로 돌아가요", false) }
+    return false;
+  }
+  if (closeOf(S, b) > nowSec()) { rpPause(S); showToast("지금 봉까지 왔어요 · 끝내기를 누르면 실시간으로 돌아가요", false); return false }
+  const ts = S.chart.timeScale(), range = ts.getVisibleLogicalRange();
+  R.T = closeOf(S, b);
+  S.bars.push(b);
+  S.vols.push(R.vols[i]);
+  S.candle.update(b);
+  S.vol.update(R.vols[i]);
+  paintInd(S, false);
+  if (range) ts.setVisibleLogicalRange(i > range.to - 2 ? { from: range.from + 1, to: range.to + 1 } : range);
+  rpStatus(S);
+  return true;
+}
+
+function rpPause(S) {
+  if (!S.rp) return;
+  clearInterval(S.rp.playT);
+  S.rp.playT = null;
+  rpStatus(S);
+}
+
+function rpToggle(S) {
+  const R = S.rp;
+  if (!R || !S.ready) return;
+  if (R.playT) { rpPause(S); return }
+  R.playT = setInterval(() => { if (S.rp === R) rpStep(S); else clearInterval(R.playT) }, rpSpeed);
+  rpStatus(S);
+}
+
+function rpStatus(S) {
+  const R = S.rp;
+  if (!R) return;
+  S.rpPlay.textContent = R.playT ? "⏸ 멈춤" : "▶ 재생";
+  S.rpPlay.classList.toggle("on", !!R.playT);
+  S.rpAt.textContent = `${rpStamp(R.T)} 까지`;
+  S.rpDate.max = toInput(nowSec());
+  if (document.activeElement !== S.rpDate) S.rpDate.value = toInput(R.T);
+  const last = S.bars.at(-1);
+  if (!last) return;
+  setPriceText(S, last.close);
+  const from = last.time + SEC[S.tf] - 86400;
+  let lo = 0, hi = S.bars.length - 1;
+  while (lo < hi) { const m = (lo + hi) >> 1; if (S.bars[m].time < from) lo = m + 1; else hi = m }
+  setChange(S, last.close, S.bars[lo].open);
+  if (!S.hover) showLbl(S);
+  drawSpark(S);
+}
+
+function wireReplayBar(S) {
+  S.rpSpeedEl.value = String(rpSpeed);
+  S.el.querySelector(".rpb").addEventListener("click", e => {
+    const b = e.target.closest("button[data-rp]");
+    if (!b) return;
+    b.blur();
+    const a = b.dataset.rp;
+    if (a === "pick") setMode(mode === "P" ? null : "P");
+    else if (a === "play") rpToggle(S);
+    else if (a === "step") { rpPause(S); rpStep(S) }
+    else if (a === "end") loadSlot(S);
+  });
+  S.rpSpeedEl.addEventListener("change", () => {
+    rpSpeed = +S.rpSpeedEl.value;
+    store.set("okx.rp.speed", String(rpSpeed));
+    S.rpSpeedEl.blur();
+    for (const x of slots) {
+      x.rpSpeedEl.value = String(rpSpeed);
+      if (x.rp?.playT) { rpPause(x); rpToggle(x) }
+    }
+  });
+  let t = null;
+  S.rpDate.addEventListener("change", () => {
+    clearTimeout(t);
+    t = setTimeout(() => {
+      const sec = Math.floor(new Date(S.rpDate.value).getTime() / 1000);
+      if (S.rp && Number.isFinite(sec) && sec !== S.rp.T) replayFrom(S, sec);
+    }, 700);
+  });
 }
 
 let universe = [], uniP = null, uniAt = 0;
@@ -1319,7 +1587,14 @@ document.addEventListener("keydown", e => {
     deleteSelected();
     return;
   }
+  const R = rpTarget();
+  if (R && !typing) {
+    if (e.key === "ArrowRight" && e.shiftKey) { e.preventDefault(); rpPause(R); rpStep(R); return }
+    if (e.key === " ") { e.preventDefault(); document.activeElement?.blur?.(); rpToggle(R); return }
+  }
   if (e.key !== "Escape" || typing) return;
+  const busy = mode || selected || [indp, topp, alp].some(p => p.classList.contains("open"));
+  if (!busy && R) { loadSlot(R); return }
   setMode(null);
   select(null);
   indp.classList.remove("open");
