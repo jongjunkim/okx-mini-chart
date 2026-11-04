@@ -83,14 +83,53 @@ main{flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto}
 #toast{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);display:none;align-items:center;gap:12px;background:#232a36;border:1px solid #3a414d;border-radius:6px;padding:7px 10px;z-index:40;white-space:nowrap}
 #toast.open{display:flex}
 #toast button{background:none;border:0;color:var(--draw);font:inherit;font-weight:600;cursor:pointer;padding:0}
+#alBtn{display:inline-flex;align-items:center;gap:4px;position:relative}
+#alBtn svg,.bell svg{width:11px;height:11px}
+#alBadge{position:absolute;top:-5px;right:-5px;min-width:14px;height:14px;padding:0 3px;border-radius:7px;background:var(--draw);color:var(--bg);font-size:10px;font-weight:700;line-height:14px;text-align:center;display:none}
+#alBadge.on{display:block}
+#alp{position:absolute;right:8px;top:100%;margin-top:2px;width:min(300px,calc(100vw - 16px));max-height:calc(100vh - 50px);overflow-y:auto;background:var(--panel);border:1px solid #3a414d;border-radius:6px;padding:8px 10px 10px;z-index:30;display:none;box-shadow:0 8px 24px #0009}
+#alp.open{display:flex;flex-direction:column;gap:10px}
+#alp .hd{display:flex;align-items:center;justify-content:space-between}
+#alp .hd b{font-size:13px;font-weight:600}
+#alp label{display:flex;align-items:center;gap:5px;cursor:pointer}
+#alp input[type=checkbox]{accent-color:var(--draw);margin:0}
+#alp .sec{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);padding-top:8px}
+#alp .sec.first{border:0;padding:0}
+#alp .k{font-size:11px;color:var(--muted)}
+#alp .chips{display:flex;align-items:center;flex-wrap:wrap;gap:4px}
+#alp .chip{display:inline-flex;align-items:center;gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:2px 6px;font-variant-numeric:tabular-nums}
+#alp .chip i{width:8px;height:2px}
+#alp .tfc{background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:3px 8px;color:var(--muted)}
+#alp .tfc.on{border-color:var(--draw);color:var(--text)}
+#alp input[type=number],#alp input[type=text],#alp select{background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:4px;font:inherit;padding:2px 4px}
+#alp input[type=number]{width:44px}
+#alp .wl{position:relative;background:var(--bg);border:1px solid var(--line);border-radius:4px}
+#alp .wr{display:flex;align-items:center;gap:6px;padding:3px 4px 3px 8px;border-bottom:1px solid #1c2129}
+#alp .wr b{flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#alp .wr .x{background:none;border:0;color:var(--muted);padding:0 6px;font-size:13px}
+#alp .wr .x:hover{color:var(--text)}
+#alp .wl input[type=text]{width:100%;border:0;background:none;padding:5px 8px}
+#alp .wl .sugg{top:100%;left:0;width:100%}
+#alp .tag{font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:0 4px;flex:none}
+#alp .rec{display:flex;align-items:center;gap:6px;padding:3px 2px;border-radius:4px;cursor:pointer;font-variant-numeric:tabular-nums}
+#alp .rec:hover{background:#1d232d}
+#alp .rec .w{width:70px;color:var(--muted);flex:none}
+#alp .rec .id{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#alp .rec .p{width:64px;text-align:right;flex:none}
+#alp .warn{color:var(--draw);font-size:11px}
+#alp .test{color:var(--text)}
+.bell{display:none;align-items:center;color:var(--draw);flex:none;margin-left:auto}
+.slot.watched .bell{display:flex}
+.slot.watched .tf{margin-left:0}
 </style>
 </head>
 <body>
 <nav>
-  <button class="tool" data-mode="h" title="수평선(지지·저항): 누른 뒤 차트를 클릭">수평</button><button class="tool" data-mode="t" title="추세선: 누른 뒤 두 점을 클릭">추세</button><button class="tool" data-mode="r" title="가격 범위: 누른 뒤 두 점을 클릭하면 가격 차이·변동률·봉 수를 보여줍니다">범위</button><button class="tool" data-mode="L" title="롱 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">롱</button><button class="tool" data-mode="S" title="숏 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">숏</button><button id="indBtn" title="이동평균·볼린저밴드">지표</button><button id="topBtn" title="24시간 거래대금 상위 10종목. 누르면 선택한 칸에 띄웁니다">TOP10</button><button id="shotBtn" title="화면 캡처(⌘S): 바탕화면에 저장하고 클립보드에도 복사합니다">캡처</button>
+  <button class="tool" data-mode="h" title="수평선(지지·저항): 누른 뒤 차트를 클릭">수평</button><button class="tool" data-mode="t" title="추세선: 누른 뒤 두 점을 클릭">추세</button><button class="tool" data-mode="r" title="가격 범위: 누른 뒤 두 점을 클릭하면 가격 차이·변동률·봉 수를 보여줍니다">범위</button><button class="tool" data-mode="L" title="롱 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">롱</button><button class="tool" data-mode="S" title="숏 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">숏</button><button id="indBtn" title="이동평균·볼린저밴드">지표</button><button id="topBtn" title="24시간 거래대금 상위 10종목. 누르면 선택한 칸에 띄웁니다">TOP10</button><button id="shotBtn" title="화면 캡처(⌘S): 바탕화면에 저장하고 클립보드에도 복사합니다">캡처</button><button id="alBtn" title="이동평균 정배열·우상향 알림"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>알림<span id="alBadge"></span></button>
   <span id="dot" title="실시간 연결"></span>
   <div id="indp"></div>
   <div id="topp"></div>
+  <div id="alp"></div>
 </nav>
 <main id="main"><button id="add">＋ 종목 추가</button></main>
 <div id="hint"></div>
@@ -399,12 +438,13 @@ function makeSlot(cfg, beforeEl) {
   el.innerHTML =
     `<div class="sh"><input class="sym" spellcheck="false" autocomplete="off" placeholder="종목 검색">` +
     `<span class="px">-</span><span class="pc"></span><canvas class="spark"></canvas>` +
+    `<span class="bell"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></span>` +
     `<select class="tf" title="봉 간격">${BARS.map(b => `<option value="${b}">${b}</option>`).join("")}</select>` +
     `<button class="ic col" title="접기"></button><button class="ic cls" title="닫기">×</button><div class="sugg"></div></div>` +
     `<div class="pane"><div class="lbl"></div><div class="c"></div><div class="empty">종목을 고르면 여기에 차트가 나와요</div></div>`;
   Object.assign(S, {
     el, symEl: el.querySelector(".sym"), pxEl: el.querySelector(".px"), pcEl: el.querySelector(".pc"), spark: el.querySelector(".spark"),
-    tfEl: el.querySelector(".tf"), colBtn: el.querySelector(".col"), suggEl: el.querySelector(".sugg"),
+    tfEl: el.querySelector(".tf"), bellEl: el.querySelector(".bell"), colBtn: el.querySelector(".col"), suggEl: el.querySelector(".sugg"),
     pane: el.querySelector(".pane"), lbl: el.querySelector(".lbl"), box: el.querySelector(".c")
   });
   S.tfEl.value = S.tf;
@@ -519,7 +559,7 @@ function setChange(S, last, open) {
 
 function resetSeries(S) {
   S.bars = []; S.vols = []; S.last = null; S.ready = false;
-  S.candle.setData([]); S.vol.setData([]);
+  S.candle.setData([]); S.vol.setData([]); S.candle.setMarkers([]);
   S.ma.forEach(s => s.setData([])); S.bbs.forEach(s => s.setData([]));
   S.candle.priceScale().applyOptions({ autoScale: true });
 }
@@ -549,6 +589,7 @@ async function loadSlot(S) {
     S.candle.setData(S.bars);
     S.vol.setData(S.vols);
     paintInd(S, true);
+    updateMarkers(S);
     S.last = rows.at(-1);
     S.ready = true;
     showLbl(S);
@@ -591,6 +632,7 @@ async function loadOlder(S, g) {
     S.candle.setData(S.bars);
     S.vol.setData(S.vols);
     paintInd(S, true);
+    updateMarkers(S);
     if (range) S.chart.timeScale().setVisibleLogicalRange({ from: range.from + add.length, to: range.to + add.length });
     S.layer.requestUpdate?.();
   } catch (e) {
@@ -610,10 +652,14 @@ async function refreshTicker(only) {
 }
 
 function wantedSubs() {
-  return new Set(slots.filter(S => S.inst).map(S => `candle${OKX_BAR[S.tf]}|${S.inst}`));
+  return new Set([
+    ...slots.filter(S => S.inst).map(S => `candle${OKX_BAR[S.tf]}|${S.inst}`),
+    ...[...watchers.values()].map(W => `candle${OKX_BAR[W.tf]}|${W.inst}`)
+  ]);
 }
 
 function syncSubs() {
+  refreshWatchers();
   if (!ws || ws.readyState !== 1) return;
   const want = wantedSubs(), arg = k => { const [channel, instId] = k.split("|"); return { channel, instId } };
   const add = [...want].filter(k => !subs.has(k)), del = [...subs].filter(k => !want.has(k));
@@ -632,6 +678,7 @@ function connect() {
   s.onopen = () => {
     setDot(true);
     syncSubs();
+    for (const W of watchers.values()) if (W.ready) catchUp(W);
     pingT = setInterval(() => s.readyState === 1 && s.send("ping"), 20000);
   };
   s.onmessage = e => {
@@ -653,6 +700,8 @@ function connect() {
       }
     }
     for (const T of slotsOf(inst)) if (T.ready) setPriceText(T, +m.data.at(-1)[4]);
+    const W = watchers.get(`${tf}|${inst}`);
+    if (W && W.ready) for (const r of m.data) onWatchBar(W, r);
   };
   s.onclose = () => {
     if (ws !== s) return;
@@ -1036,14 +1085,18 @@ async function resolveInst(v) {
   return v + "-USDT";
 }
 
-function renderSugg(S, show) {
-  if (!show) { S.suggEl.classList.remove("open"); return }
-  S.suggEl.innerHTML = S.sugg.length ? S.sugg.map((u, i) => {
+function suggHtml(list, selIdx) {
+  return list.length ? list.map((u, i) => {
     const pc = u.open ? (u.last - u.open) / u.open * 100 : 0;
-    return `<div class="it${i === S.selIdx ? " sel" : ""}" data-i="${i}"><span class="id">${esc(u.id)}</span><span class="tag">${u.type}</span>` +
+    return `<div class="it${i === selIdx ? " sel" : ""}" data-i="${i}"><span class="id">${esc(u.id)}</span><span class="tag">${u.type}</span>` +
       `<span class="ipx">${u.last.toLocaleString("en-US", { maximumSignificantDigits: 6 })}</span>` +
       `<span class="ipc" style="color:${pc >= 0 ? C("--up") : C("--down")}">${pctStr(pc)}</span></div>`;
   }).join("") : '<div class="it none">일치하는 종목 없음</div>';
+}
+
+function renderSugg(S, show) {
+  if (!show) { S.suggEl.classList.remove("open"); return }
+  S.suggEl.innerHTML = suggHtml(S.sugg, S.selIdx);
   S.suggEl.classList.add("open");
 }
 
@@ -1148,6 +1201,7 @@ indp.addEventListener("change", e => {
   else return;
   store.set("okx.ind", JSON.stringify(ind));
   for (const S of slots) { paintInd(S, true); if (!S.hover) showLbl(S) }
+  topUpWatchers();
 });
 
 indp.addEventListener("click", e => {
@@ -1185,6 +1239,7 @@ $("topBtn").onclick = () => {
   if (topp.classList.contains("open")) { closeTop(); return }
   indp.classList.remove("open");
   $("indBtn").classList.remove("active");
+  closeAlertPanel();
   topp.classList.add("open");
   $("topBtn").classList.add("active");
   renderTop();
@@ -1206,7 +1261,7 @@ document.addEventListener("mousedown", e => {
 
 $("indBtn").onclick = () => {
   const open = !indp.classList.contains("open");
-  if (open) closeTop();
+  if (open) { closeTop(); closeAlertPanel() }
   if (open) buildIndPanel();
   indp.classList.toggle("open", open);
   $("indBtn").classList.toggle("active", open);
@@ -1231,14 +1286,369 @@ document.addEventListener("keydown", e => {
   indp.classList.remove("open");
   $("indBtn").classList.remove("active");
   closeTop();
+  closeAlertPanel();
 });
+
+const ALERT_TFS = ["1m", "5m", "15m", "1h"];
+const SOUNDS = ["Glass", "Ping", "Hero", "Submarine", "Funk", "Pop", "Purr", "Tink", "Blow", "Bottle", "Frog", "Morse", "Basso", "Sosumi"];
+let alertCfg = (() => {
+  try { const v = JSON.parse(store.get("okx.alert", "")); if (v && Array.isArray(v.tfs) && Array.isArray(v.watch)) return v } catch (e) {}
+  return { on: false, n: 5, tfs: ["5m", "15m"], slots: true, watch: [], banner: true, sound: true, soundName: "Glass" };
+})();
+let alertLog = (() => {
+  try { const v = JSON.parse(store.get("okx.alert.log", "")); if (Array.isArray(v)) return v } catch (e) {}
+  return [];
+})();
+let alertUnseen = 0, alSugg = [], alSel = 0, watchChain = Promise.resolve();
+const watchers = new Map();
+const alp = $("alp");
+
+const post = m => { try { window.webkit.messageHandlers.win.postMessage(m); return true } catch (e) { return false } };
+const saveAlert = () => store.set("okx.alert", JSON.stringify(alertCfg));
+const hm = ms => new Date(ms).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+const watchBar = (r, inst) => ({ ts: +r[0], c: +r[4], v: +r[volIdx(inst)] });
+
+function whenStr(ms) {
+  const d = new Date(ms).toDateString(), now = Date.now();
+  if (d === new Date(now).toDateString()) return hm(ms);
+  if (d === new Date(now - 864e5).toDateString()) return "어제 " + hm(ms);
+  const t = new Date(ms);
+  return `${t.getMonth() + 1}/${t.getDate()} ${hm(ms)}`;
+}
+
+function activeMAs() {
+  return ind.ma.map((m, k) => ({ ...m, k })).filter(m => m.on).sort((a, b) => a.n - b.n);
+}
+
+function maChain(ms) {
+  return ms.map((m, i) => i && m.type === ms[i - 1].type ? m.n : m.type + m.n).join(" > ");
+}
+
+function needBars() {
+  const ms = activeMAs();
+  return Math.min(1500, Math.max(300, (ms.length ? ms.at(-1).n : 0) * 3 + alertCfg.n + 10));
+}
+
+function alertInsts() {
+  if (!alertCfg.on || !alertCfg.tfs.length) return [];
+  return [...new Set([...(alertCfg.slots ? slots.map(S => S.inst).filter(Boolean) : []), ...alertCfg.watch])];
+}
+
+function refreshWatchers() {
+  const want = new Set(alertInsts().flatMap(inst => alertCfg.tfs.map(tf => `${tf}|${inst}`)));
+  for (const [k, W] of watchers) {
+    if (want.has(k)) continue;
+    W.gen++;
+    clearTimeout(W.retryT);
+    watchers.delete(k);
+  }
+  for (const k of want) {
+    if (watchers.has(k)) continue;
+    const [tf, inst] = k.split("|");
+    const W = { tf, inst, bars: [], gen: 0, ready: false, full: false, lastEval: 0, catching: false, retryT: null };
+    watchers.set(k, W);
+    queueLoad(W);
+  }
+  const insts = alertInsts();
+  for (const S of slots) {
+    const on = !!S.inst && insts.includes(S.inst);
+    S.el.classList.toggle("watched", on);
+    S.bellEl.title = on ? `정배열 알림 감시 중 (${alertCfg.tfs.join("·")})` : "";
+  }
+}
+
+function queueLoad(W) {
+  watchChain = watchChain.then(() => loadWatcher(W)).catch(() => {});
+}
+
+function topUpWatchers() {
+  for (const W of watchers.values()) if (W.ready && !W.full && W.bars.length < needBars()) queueLoad(W);
+}
+
+async function loadWatcher(W) {
+  const g = ++W.gen;
+  clearTimeout(W.retryT);
+  try {
+    const rows = (await getJson(`${API}/market/candles?instId=${W.inst}&bar=${OKX_BAR[W.tf]}&limit=300`)).filter(r => r[8] === "1");
+    let bars = rows.reverse().map(r => watchBar(r, W.inst)), full = false;
+    while (g === W.gen && bars.length && bars.length < needBars()) {
+      await new Promise(r => setTimeout(r, 200));
+      const older = (await getJson(`${API}/market/history-candles?instId=${W.inst}&bar=${OKX_BAR[W.tf]}&after=${bars[0].ts}&limit=300`))
+        .reverse().map(r => watchBar(r, W.inst)).filter(b => b.ts < bars[0].ts);
+      if (!older.length) { full = true; break }
+      bars = older.concat(bars);
+    }
+    if (g !== W.gen) return;
+    W.bars = bars;
+    W.full = full;
+    W.lastEval = Math.max(W.lastEval, bars.at(-1)?.ts || 0);
+    W.ready = true;
+  } catch (e) {
+    if (g === W.gen) W.retryT = setTimeout(() => { if (watchers.get(`${W.tf}|${W.inst}`) === W) queueLoad(W) }, 30000);
+  }
+}
+
+function onWatchBar(W, r) {
+  const ts = +r[0], last = W.bars.at(-1), iv = SEC[W.tf] * 1000;
+  if (r[8] !== "1") { if (last && ts > last.ts + iv) catchUp(W); return }
+  if (last && ts <= last.ts) return;
+  if (last && ts > last.ts + iv) { catchUp(W); return }
+  W.bars.push(watchBar(r, W.inst));
+  trimWatcher(W);
+  evalWatcher(W);
+}
+
+function trimWatcher(W) {
+  const keep = needBars() + 200;
+  if (W.bars.length > keep) W.bars.splice(0, W.bars.length - keep);
+}
+
+async function catchUp(W) {
+  if (W.catching || !W.ready) return;
+  W.catching = true;
+  const g = W.gen;
+  try {
+    const rows = (await getJson(`${API}/market/candles?instId=${W.inst}&bar=${OKX_BAR[W.tf]}&limit=20`)).filter(r => r[8] === "1").reverse();
+    if (g !== W.gen) return;
+    const last = W.bars.at(-1), add = rows.map(r => watchBar(r, W.inst)).filter(b => !last || b.ts > last.ts);
+    if (!add.length) return;
+    if (last && add[0].ts > last.ts + SEC[W.tf] * 1000) { queueLoad(W); return }
+    W.bars.push(...add);
+    trimWatcher(W);
+    evalWatcher(W);
+  } catch (e) {
+  } finally {
+    W.catching = false;
+  }
+}
+
+function alignedAt(lines, i, n) {
+  for (let j = 0; j < lines.length; j++) {
+    const v = lines[j][i], p = lines[j][i - n];
+    if (v == null || p == null || !(v > p)) return false;
+    if (j && !(lines[j - 1][i] > v)) return false;
+  }
+  return true;
+}
+
+function evalWatcher(W) {
+  const ms = activeMAs(), i = W.bars.length - 1;
+  if (ms.length < 2 || i <= alertCfg.n) return;
+  const ts = W.bars[i].ts;
+  if (ts <= W.lastEval) return;
+  W.lastEval = ts;
+  const cl = W.bars.map(b => b.c), vl = W.bars.map(b => b.v);
+  const lines = ms.map(m => m.type === "EMA" ? ema(cl, m.n) : m.type === "VWMA" ? vwma(cl, vl, m.n) : sma(cl, m.n));
+  if (alignedAt(lines, i, alertCfg.n) && !alignedAt(lines, i - 1, alertCfg.n)) fireAlert(W, ms, cl[i], ts);
+}
+
+function fireAlert(W, ms, close, ts) {
+  const at = ts + SEC[W.tf] * 1000, px = close.toLocaleString("en-US", { maximumSignificantDigits: 6 });
+  alertLog.unshift({ inst: W.inst, tf: W.tf, ts, at, px });
+  alertLog.length = Math.min(alertLog.length, 30);
+  store.set("okx.alert.log", JSON.stringify(alertLog));
+  const title = `${W.inst} · ${W.tf} 정배열`;
+  post({ notify: {
+    title, body: `${maChain(ms)}, 모두 ${alertCfg.n}봉 전보다 위\n${hm(at)} 봉 마감 · 종가 ${px}`,
+    inst: W.inst, tf: W.tf, banner: !!alertCfg.banner, sound: alertCfg.sound ? alertCfg.soundName : ""
+  } });
+  showToast(`${title} · ${hm(at)} 봉 마감 · ${px}`, false);
+  if (alp.classList.contains("open")) renderAlertPanel();
+  else { alertUnseen++; updateAlertBadge() }
+  slotsOf(W.inst).forEach(updateMarkers);
+}
+
+function updateMarkers(S) {
+  if (!S.inst || !S.bars.length) { S.candle.setMarkers([]); return }
+  const times = new Set(alertLog.filter(e => e.inst === S.inst && e.tf === S.tf).map(e => Math.floor(e.ts / 1000) + TZ)
+    .filter(t => idxOfTime(S.bars, t) >= 0));
+  S.candle.setMarkers([...times].sort((a, b) => a - b).map(t => ({
+    time: t, position: "belowBar", color: C("--draw"), shape: "arrowUp", text: "정배열 " + hm((t - TZ + SEC[S.tf]) * 1000)
+  })));
+}
+
+function updateAlertBadge() {
+  $("alBadge").textContent = alertUnseen > 9 ? "9+" : alertUnseen;
+  $("alBadge").classList.toggle("on", alertUnseen > 0);
+}
+
+function renderAlertPanel() {
+  const ms = activeMAs(), nSlots = new Set(slots.map(S => S.inst).filter(Boolean)).size, chk = v => v ? " checked" : "";
+  alp.innerHTML =
+    `<div class="hd"><b>정배열 알림</b><label class="k">켜기<input type="checkbox" data-f="on"${chk(alertCfg.on)}></label></div>` +
+    `<div class="sec first"><span class="k">조건</span>` +
+    (ms.length >= 2
+      ? `<div class="chips">${ms.map((m, i) => `${i ? '<span class="k">&gt;</span>' : ""}<span class="chip"><i style="background:${maColor(m.k)}"></i>${m.type}${m.n}</span>`).join("")}</div>`
+      : '<span class="warn">지표에서 이동평균을 2개 이상 켜야 알림이 울려요</span>') +
+    `<span class="k">짧은 선이 위에 오는 순서(정배열). 지표에서 켠 이동평균을 그대로 씁니다.</span>` +
+    `<label>우상향: 모든 선이<input type="number" min="1" max="50" data-f="n" value="${alertCfg.n}">봉 전보다 높음</label>` +
+    `<span class="k">봉이 마감될 때 판정하고, 조건이 새로 맞은 순간 한 번만 울립니다.</span></div>` +
+    `<div class="sec"><span class="k">봉 간격</span><div class="chips">` +
+    ALERT_TFS.map(tf => `<label class="tfc${alertCfg.tfs.includes(tf) ? " on" : ""}"><input type="checkbox" data-f="tf" data-v="${tf}"${chk(alertCfg.tfs.includes(tf))}>${tf}</label>`).join("") +
+    `</div></div>` +
+    `<div class="sec"><span class="k">대상 종목</span>` +
+    `<label><input type="checkbox" data-f="slots"${chk(alertCfg.slots)}>칸에 띄운 종목 <span class="k">(${nSlots}개, 칸의 봉 간격이 아니라 위 간격으로 봄)</span></label>` +
+    `<span class="k">감시 목록 (칸에 없어도 봄)</span><div class="wl">` +
+    alertCfg.watch.map((id, i) => `<div class="wr"><b>${esc(id)}</b><span class="k" data-px="${esc(id)}"></span><button class="x" data-rm="${i}" title="감시 목록에서 빼기">×</button></div>`).join("") +
+    `<input type="text" id="alAdd" spellcheck="false" autocomplete="off" placeholder="＋ 종목 추가 (예: sam, koru)"><div class="sugg"></div></div></div>` +
+    `<div class="sec"><span class="k">알림 방법</span><div class="chips" style="gap:10px">` +
+    `<label><input type="checkbox" data-f="banner"${chk(alertCfg.banner)}>맥 알림 배너</label>` +
+    `<label><input type="checkbox" data-f="sound"${chk(alertCfg.sound)}>소리</label>` +
+    `<select data-f="soundName" title="알림 소리">${SOUNDS.map(s => `<option${s === alertCfg.soundName ? " selected" : ""}>${s}</option>`).join("")}</select>` +
+    `<button class="test" data-act="test" title="지금 설정으로 시험 알림을 한 번 보냅니다">시험</button></div></div>` +
+    `<div class="sec"><span class="k">최근 알림 · 누르면 그 종목을 선택한 칸에 띄움</span>` +
+    (alertLog.length
+      ? alertLog.slice(0, 5).map((e, i) => `<div class="rec" data-i="${i}"><span class="w">${whenStr(e.at)}</span><span class="id">${esc(e.inst)}</span><span class="tag">${e.tf}</span><span class="p">${esc(e.px)}</span></div>`).join("")
+      : '<span class="k">아직 없음</span>') +
+    `</div>`;
+  fillWatchPrices();
+}
+
+async function fillWatchPrices() {
+  await loadUniverse();
+  for (const el of alp.querySelectorAll("[data-px]")) {
+    const u = universe.find(x => x.id === el.dataset.px);
+    if (u) el.textContent = u.last.toLocaleString("en-US", { maximumSignificantDigits: 6 });
+  }
+}
+
+function renderAlSugg(show) {
+  const box = alp.querySelector(".wl .sugg");
+  if (!box) return;
+  if (!show) { box.classList.remove("open"); return }
+  box.innerHTML = suggHtml(alSugg, alSel);
+  box.classList.add("open");
+}
+
+function addWatch(id) {
+  alSugg = [];
+  if (id && !alertCfg.watch.includes(id)) { alertCfg.watch.push(id); saveAlert(); syncSubs() }
+  renderAlertPanel();
+  $("alAdd")?.focus();
+}
+
+function closeAlertPanel() {
+  alp.classList.remove("open");
+  $("alBtn").classList.remove("active");
+}
+
+window.openAlert = (inst, tf) => {
+  if (!inst) return;
+  closeAlertPanel();
+  let S = slots.find(x => x.inst === inst && x.tf === tf) || slots.find(x => x.inst === inst);
+  if (!S) S = activeSlot && slots.includes(activeSlot) ? activeSlot : slots[0];
+  const change = S.inst !== inst || (BARS.includes(tf) && S.tf !== tf);
+  if (change) {
+    if (selectedInst === S.inst) select(null);
+    S.inst = inst;
+    if (BARS.includes(tf)) { S.tf = tf; S.tfEl.value = tf; S.chart.applyOptions({ timeScale: { timeVisible: tf !== "1d" } }) }
+    saveSlots();
+    loadSlot(S);
+    syncSubs();
+  }
+  activeSlot = S;
+  if (S.collapsed) setCollapsed(S, false);
+  S.el.scrollIntoView({ block: "nearest" });
+};
+window.notifyDenied = () => showToast("맥 알림이 막혀 있어요 · 시스템 설정 > 알림에서 OKX Mini Chart 를 허용하세요", false);
+
+$("alBtn").onclick = () => {
+  if (alp.classList.contains("open")) { closeAlertPanel(); return }
+  closeTop();
+  indp.classList.remove("open");
+  $("indBtn").classList.remove("active");
+  alertUnseen = 0;
+  updateAlertBadge();
+  renderAlertPanel();
+  alp.classList.add("open");
+  $("alBtn").classList.add("active");
+};
+
+document.addEventListener("mousedown", e => {
+  if (alp.classList.contains("open") && !alp.contains(e.target) && !$("alBtn").contains(e.target)) closeAlertPanel();
+});
+
+alp.addEventListener("change", e => {
+  const t = e.target, f = t.dataset.f;
+  if (f === "on") { alertCfg.on = t.checked; if (alertCfg.on && alertCfg.banner) post({ notifyAuth: true }) }
+  else if (f === "n") alertCfg.n = clampInt(t.value, 1, 50, alertCfg.n);
+  else if (f === "tf") alertCfg.tfs = ALERT_TFS.filter(x => x === t.dataset.v ? t.checked : alertCfg.tfs.includes(x));
+  else if (f === "slots") alertCfg.slots = t.checked;
+  else if (f === "banner") { alertCfg.banner = t.checked; if (t.checked) post({ notifyAuth: true }) }
+  else if (f === "sound") alertCfg.sound = t.checked;
+  else if (f === "soundName") { alertCfg.soundName = t.value; post({ sound: t.value }) }
+  else return;
+  saveAlert();
+  renderAlertPanel();
+  syncSubs();
+  topUpWatchers();
+});
+
+alp.addEventListener("input", async e => {
+  if (e.target.id !== "alAdd") return;
+  await loadUniverse();
+  alSugg = search(e.target.value).filter(u => !alertCfg.watch.includes(u.id));
+  alSel = 0;
+  renderAlSugg(!!e.target.value.trim());
+});
+
+alp.addEventListener("focusin", e => { if (e.target.id === "alAdd") loadUniverse() });
+alp.addEventListener("focusout", e => { if (e.target.id === "alAdd") renderAlSugg(false) });
+
+alp.addEventListener("keydown", async e => {
+  if (e.target.id !== "alAdd") return;
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    if (!alSugg.length) return;
+    e.preventDefault();
+    alSel = (alSel + (e.key === "ArrowDown" ? 1 : -1) + alSugg.length) % alSugg.length;
+    renderAlSugg(true);
+    return;
+  }
+  if (e.key === "Escape") { e.target.blur(); return }
+  if (e.key !== "Enter") return;
+  const v = e.target.value.trim().toUpperCase();
+  if (v) addWatch(alSugg[alSel]?.id || await resolveInst(v));
+});
+
+alp.addEventListener("mousedown", e => {
+  const it = e.target.closest(".sugg .it[data-i]");
+  if (!it) return;
+  e.preventDefault();
+  addWatch(alSugg[+it.dataset.i].id);
+});
+
+alp.addEventListener("click", e => {
+  const rm = e.target.closest("[data-rm]");
+  if (rm) { alertCfg.watch.splice(+rm.dataset.rm, 1); saveAlert(); renderAlertPanel(); syncSubs(); return }
+  if (e.target.closest("[data-act=test]")) {
+    const ms = activeMAs();
+    const ok = post({ notify: {
+      title: "정배열 알림 시험", body: `${ms.length >= 2 ? maChain(ms) : "이동평균 2개 이상 필요"}, 모두 ${alertCfg.n}봉 전보다 위\n실제 알림은 이렇게 옵니다`,
+      inst: "", tf: "", banner: !!alertCfg.banner, sound: alertCfg.sound ? alertCfg.soundName : ""
+    } });
+    if (!ok) showToast("맥 알림은 앱에서만 돼요", false);
+    return;
+  }
+  const rec = e.target.closest(".rec[data-i]");
+  if (rec) { const r = alertLog[+rec.dataset.i]; if (r) openAlert(r.inst, r.tf) }
+});
+
+function watchdog() {
+  const now = Date.now();
+  for (const W of watchers.values()) {
+    const last = W.bars.at(-1);
+    if (W.ready && last && now >= last.ts + 2 * SEC[W.tf] * 1000 + 3000) catchUp(W);
+  }
+}
 
 for (const cfg of loadSlotConfig()) slots.push(makeSlot(cfg));
 activeSlot = slots[0];
 layout();
+refreshWatchers();
 slots.forEach(loadSlot);
 connect();
 setInterval(() => { refreshTicker(); if (topp.classList.contains("open")) renderTop() }, 10000);
+setInterval(watchdog, 20000);
 </script>
 </body>
 </html>

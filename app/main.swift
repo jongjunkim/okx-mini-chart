@@ -1,7 +1,8 @@
 import AppKit
+import UserNotifications
 import WebKit
 
-final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
+final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler, UNUserNotificationCenterDelegate {
     private var window: NSWindow!
     private var webView: WKWebView!
     private var pinItem: NSMenuItem!
@@ -13,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         buildMenu()
+        UNUserNotificationCenter.current().delegate = self
 
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
@@ -56,6 +58,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.name == "win", let body = message.body as? [String: Any] else { return }
         if body["shot"] as? Bool == true { capture(); return }
+        if let n = body["notify"] as? [String: Any] { notify(n); return }
+        if body["notifyAuth"] as? Bool == true { requestNotifyAuth { _ in }; return }
+        if let s = body["sound"] as? String { NSSound(named: NSSound.Name(s))?.play(); return }
         guard let dy = body["dy"] as? Double, dy.isFinite else { return }
         resizeWindow(by: CGFloat(dy))
     }
@@ -92,9 +97,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         }
     }
 
+    private func js(_ s: String?) -> String {
+        s.map { "\"\($0.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\""))\"" } ?? "null"
+    }
+
     private func shotDone(_ name: String?, _ err: String?) {
-        let js = { (s: String?) in s.map { "\"\($0.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\""))\"" } ?? "null" }
         webView.evaluateJavaScript("shotDone(\(js(name)), \(js(err)))")
+    }
+
+    private func requestNotifyAuth(_ done: @escaping (Bool) -> Void) {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert]) { [weak self] granted, _ in
+            DispatchQueue.main.async {
+                if !granted { self?.webView.evaluateJavaScript("notifyDenied()") }
+                done(granted)
+            }
+        }
+    }
+
+    private func notify(_ n: [String: Any]) {
+        if let s = n["sound"] as? String, !s.isEmpty { NSSound(named: NSSound.Name(s))?.play() }
+        guard n["banner"] as? Bool ?? true else { return }
+        let content = UNMutableNotificationContent()
+        content.title = n["title"] as? String ?? ""
+        content.body = n["body"] as? String ?? ""
+        content.userInfo = ["inst": n["inst"] as? String ?? "", "tf": n["tf"] as? String ?? ""]
+        requestNotifyAuth { granted in
+            guard granted else { return }
+            UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
+        }
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
+                                withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .list])
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
+        let info = response.notification.request.content.userInfo
+        let inst = info["inst"] as? String ?? "", tf = info["tf"] as? String ?? ""
+        DispatchQueue.main.async {
+            NSApp.activate(ignoringOtherApps: true)
+            self.window.makeKeyAndOrderFront(nil)
+            if !inst.isEmpty { self.webView.evaluateJavaScript("openAlert(\(self.js(inst)), \(self.js(tf)))") }
+        }
+        completionHandler()
     }
 
     private func resizeWindow(by dy: CGFloat) {
