@@ -88,6 +88,9 @@ main{flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto}
 #toast.open{display:flex}
 #toast button{background:none;border:0;color:var(--draw);font:inherit;font-weight:600;cursor:pointer;padding:0}
 #alBtn{display:inline-flex;align-items:center;gap:4px;position:relative}
+nav .dbtn{display:inline-flex;align-items:center;padding:3px 6px}
+nav .dbtn svg{width:13px;height:13px}
+nav .dbtn:disabled{opacity:.35;cursor:default}
 #alBtn svg,.bell svg{width:11px;height:11px}
 #alBadge{position:absolute;top:-5px;right:-5px;min-width:14px;height:14px;padding:0 3px;border-radius:7px;background:var(--draw);color:var(--bg);font-size:10px;font-weight:700;line-height:14px;text-align:center;display:none}
 #alBadge.on{display:block}
@@ -258,7 +261,7 @@ body.trading #dock{display:flex}
 </head>
 <body>
 <nav>
-  <button class="tool" data-mode="h" title="수평선(지지·저항): 누른 뒤 차트를 클릭">수평</button><button class="tool" data-mode="t" title="추세선: 누른 뒤 두 점을 클릭">추세</button><button class="tool" data-mode="r" title="가격 범위: 누른 뒤 두 점을 클릭하면 가격 차이·변동률·봉 수를 보여줍니다">범위</button><button class="tool" data-mode="L" title="롱 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">롱</button><button class="tool" data-mode="S" title="숏 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">숏</button><button class="tool" data-mode="P" title="리플레이: 누른 뒤 시작할 봉을 클릭. 그 봉까지만 보이고 한 봉씩 넘겨 봅니다">리플레이</button><button id="indBtn" title="이동평균·볼린저밴드·RSI">지표</button><button id="topBtn" title="24시간 거래대금 상위 10종목. 누르면 선택한 칸에 띄웁니다">TOP10</button><button id="shotBtn" title="차트 캡처(⌘S): 칸이 여러 개면 찍을 차트를 클릭합니다. 창 전체는 ⌘⇧S. 바탕화면에 저장하고 클립보드에도 복사합니다">캡처</button><button id="alBtn" title="이동평균 정배열·우상향 알림"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>알림<span id="alBadge"></span></button><button id="tradeBtn" title="가상 거래 주문 패널·포지션 창 열고 닫기. 차트 우클릭 주문과 포지션 선은 패널을 닫아도 쓸 수 있습니다. 실제 주문은 나가지 않습니다">거래</button>
+  <button class="tool" data-mode="h" title="수평선(지지·저항): 누른 뒤 차트를 클릭">수평</button><button class="tool" data-mode="t" title="추세선: 누른 뒤 두 점을 클릭">추세</button><button class="tool" data-mode="r" title="가격 범위: 누른 뒤 두 점을 클릭하면 가격 차이·변동률·봉 수를 보여줍니다">범위</button><button class="tool" data-mode="L" title="롱 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">롱</button><button class="tool" data-mode="S" title="숏 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">숏</button><button id="drawUndo" class="dbtn" title="그린 선 되돌리기 (⌘Z)" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button><button id="drawRedo" class="dbtn" title="그린 선 다시 실행 (⌘⇧Z)" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button><button id="drawLock" class="dbtn"></button><button class="tool" data-mode="P" title="리플레이: 누른 뒤 시작할 봉을 클릭. 그 봉까지만 보이고 한 봉씩 넘겨 봅니다">리플레이</button><button id="indBtn" title="이동평균·볼린저밴드·RSI">지표</button><button id="topBtn" title="24시간 거래대금 상위 10종목. 누르면 선택한 칸에 띄웁니다">TOP10</button><button id="shotBtn" title="차트 캡처(⌘S): 칸이 여러 개면 찍을 차트를 클릭합니다. 창 전체는 ⌘⇧S. 바탕화면에 저장하고 클립보드에도 복사합니다">캡처</button><button id="alBtn" title="이동평균 정배열·우상향 알림"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>알림<span id="alBadge"></span></button><button id="tradeBtn" title="가상 거래 주문 패널·포지션 창 열고 닫기. 차트 우클릭 주문과 포지션 선은 패널을 닫아도 쓸 수 있습니다. 실제 주문은 나가지 않습니다">거래</button>
   <span id="balChip" title="자산 탭 열기">가상 잔고 <b id="balTxt">0.00</b> USDT</span>
   <span id="dot" title="실시간 연결"></span>
   <div id="indp"></div>
@@ -602,6 +605,55 @@ function saveDrawings(inst) {
   store.set("okx.draw." + inst, JSON.stringify(drawingsOf(inst)));
   updateClearBtn();
 }
+
+const drawHist = { undo: [], redo: [] }, DRAW_HIST_MAX = 100;
+let drawLocked = store.get("okx.draw.lock", "") === "1";
+const LOCK_SVG = open => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="${open ? "M8 11V7a4 4 0 0 1 7.5-2" : "M8 11V7a4 4 0 0 1 8 0v4"}"/></svg>`;
+
+function snapDrawings(inst) { return JSON.stringify(drawingsOf(inst)) }
+
+function pushDrawHist(inst, before = snapDrawings(inst)) {
+  drawHist.undo.push({ inst, before });
+  if (drawHist.undo.length > DRAW_HIST_MAX) drawHist.undo.shift();
+  drawHist.redo.length = 0;
+  updateDrawBtns();
+}
+
+function stepDrawHist(back) {
+  const from = back ? drawHist.undo : drawHist.redo, to = back ? drawHist.redo : drawHist.undo;
+  if (drag || !from.length) return;
+  const h = from.pop();
+  to.push({ inst: h.inst, before: snapDrawings(h.inst) });
+  if (selectedInst === h.inst) { selected = null; selectedInst = null; updateHint() }
+  if (pending?.inst === h.inst) { pending = null; preview = null }
+  drawCache[h.inst] = JSON.parse(h.before);
+  saveDrawings(h.inst);
+  syncDrawings(h.inst);
+  updateDrawBtns();
+  if (!slotsOf(h.inst).length) showToast(`${h.inst} 그린 선을 ${back ? "되돌렸어요" : "다시 실행했어요"}`, false);
+}
+
+function updateDrawBtns() {
+  $("drawUndo").disabled = !drawHist.undo.length;
+  $("drawRedo").disabled = !drawHist.redo.length;
+  const L = $("drawLock");
+  L.innerHTML = LOCK_SVG(!drawLocked);
+  L.classList.toggle("active", drawLocked);
+  L.title = drawLocked ? "그린 선 잠김: 클릭·끌기로 움직이지 않습니다. 누르면 풉니다" : "그린 선 잠그기: 잘못 끌어 움직이지 않게 고정합니다";
+}
+
+function setDrawLock(on) {
+  drawLocked = on;
+  store.set("okx.draw.lock", on ? "1" : "0");
+  if (on) select(null);
+  for (const S of slots) S.box.classList.remove("hov-ns", "hov-pt", "hov-ew", "hov-move");
+  updateDrawBtns();
+}
+
+$("drawUndo").onclick = () => stepDrawHist(true);
+$("drawRedo").onclick = () => stepDrawHist(false);
+$("drawLock").onclick = () => setDrawLock(!drawLocked);
+updateDrawBtns();
 
 function syncDrawings(inst) {
   for (const S of inst ? slotsOf(inst) : slots) {
@@ -1203,7 +1255,7 @@ function select(d, inst) {
 
 function deleteSelected() {
   const inst = selectedInst, arr = drawingsOf(inst), i = arr.indexOf(selected);
-  if (i >= 0) arr.splice(i, 1);
+  if (i >= 0) { pushDrawHist(inst); arr.splice(i, 1) }
   selected = null; selectedInst = null;
   saveDrawings(inst);
   updateHint();
@@ -1254,7 +1306,7 @@ function localPt(box, e) {
 
 function setHoverCursor(S, e) {
   const pt = localPt(S.box, e), th = pt.x <= S.layer.width ? tHover(S, pt) : null;
-  const part = th ? null : pt.x <= S.layer.width ? hitTest(S, pt)?.part : null;
+  const part = th || drawLocked ? null : pt.x <= S.layer.width ? hitTest(S, pt)?.part : null;
   S.box.classList.toggle("hov-ns", th === "ns" || part === "h" || part === "tp" || part === "sl");
   S.box.classList.toggle("hov-pt", th === "x" || part === "a1" || part === "a2");
   S.box.classList.toggle("hov-ew", part === "w");
@@ -1266,11 +1318,11 @@ function onPointerDown(S, e) {
   const pt = localPt(S.box, e);
   if (pt.x > S.layer.width) return;
   if (tPointerDown(S, pt, e)) return;
-  const hit = hitTest(S, pt);
+  const hit = drawLocked ? null : hitTest(S, pt);
   if (!hit) { if (selected) select(null); return }
   e.stopPropagation();
   select(hit.d, S.inst);
-  drag = { S, d: hit.d, part: hit.part, orig: { ...hit.d }, tp0: pointToTP(S, pt), moved: false };
+  drag = { S, d: hit.d, part: hit.part, orig: { ...hit.d }, before: snapDrawings(S.inst), tp0: pointToTP(S, pt), moved: false };
 }
 
 function moveHline(inst, d) {
@@ -1304,9 +1356,11 @@ window.addEventListener("pointermove", e => {
 
 window.addEventListener("pointerup", () => {
   if (!drag) return;
-  const { moved, S } = drag;
+  const { moved, S, before } = drag;
   drag = null;
-  if (moved) saveDrawings(S.inst);
+  if (!moved) return;
+  pushDrawHist(S.inst, before);
+  saveDrawings(S.inst);
 });
 
 function newPosition(S, type, tp) {
@@ -1331,10 +1385,12 @@ function onChartClick(S, param) {
   } else {
     d = { type: mode, t1: pending.t, p1: pending.p, t2: tp.t, p2: tp.p };
   }
+  pushDrawHist(S.inst);
   drawingsOf(S.inst).push(d);
   saveDrawings(S.inst);
   setMode(null);
-  select(d, S.inst);
+  if (drawLocked) syncDrawings(S.inst);
+  else select(d, S.inst);
 }
 
 let rpSpeed = RP_SPEEDS.some(([v]) => v === +store.get("okx.rp.speed", "")) ? +store.get("okx.rp.speed", "") : 333;
@@ -1727,6 +1783,7 @@ indp.addEventListener("change", e => {
 indp.addEventListener("click", e => {
   const inst = (activeSlot || slots[0])?.inst;
   if (e.target.id !== "clrDraw" || !inst || !drawingsOf(inst).length) return;
+  pushDrawHist(inst);
   drawingsOf(inst).length = 0;
   if (selectedInst === inst) { selected = null; selectedInst = null; updateHint() }
   saveDrawings(inst);
@@ -1796,6 +1853,11 @@ document.addEventListener("mousedown", e => {
 document.addEventListener("keydown", e => {
   if (shotPick && e.key === "Escape") { endShotPick(); return }
   const typing = /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName || "");
+  if (e.code === "KeyZ" && e.metaKey && !e.ctrlKey && !e.altKey && !typing) {
+    e.preventDefault();
+    stepDrawHist(!e.shiftKey);
+    return;
+  }
   if ((e.key === "Backspace" || e.key === "Delete") && selected && !typing) {
     e.preventDefault();
     deleteSelected();
@@ -2955,6 +3017,7 @@ $("tctx").addEventListener("click", e => {
   else if (a === "cancel") tCancel(m.oid);
   else if (a === "hline") {
     if (!m.S.inst) return;
+    pushDrawHist(m.S.inst);
     drawingsOf(m.S.inst).push({ type: "h", price: +m.price.toFixed(m.S.prec) });
     saveDrawings(m.S.inst);
     syncDrawings(m.S.inst);
