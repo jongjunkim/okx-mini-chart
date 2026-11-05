@@ -230,6 +230,21 @@ body.trading #dock{display:flex}
 #tctx .mi i{width:8px;height:8px;flex:none;border-radius:2px}
 #tctx .mi em{margin-left:auto;padding-left:14px;color:var(--muted);font-style:normal}
 #tctx .sep{height:1px;margin:3px 0;background:var(--line)}
+#tctx .qk{display:flex;flex-direction:column;gap:7px;width:256px;padding:4px 10px 8px}
+#tctx .qh{display:flex;align-items:baseline;gap:8px;font-weight:600}
+#tctx .qh span{margin-left:auto;color:var(--muted);font-size:11px;font-weight:400}
+#qUnit{margin-left:6px;padding:0 0 0 6px;background:none;border:0;border-left:1px solid var(--line);color:var(--muted);font:inherit;font-size:11px;cursor:pointer}
+#qUnit:hover{color:var(--text)}
+#qCalc{display:grid;grid-template-columns:auto 1fr;gap:3px 8px;margin:0;font-size:11px}
+#qCalc dt{color:var(--muted)}
+#qCalc dd{margin:0;text-align:right}
+#qCalc .w{color:var(--draw)}
+#tctx .qgo{display:grid;grid-template-columns:1fr auto;gap:6px}
+#tctx .qgo button{border:0;border-radius:5px;padding:7px 12px;font:inherit;font-weight:700;color:#fff;cursor:pointer}
+#tctx .qgo .b{background:var(--up)}
+#tctx .qgo .s{background:var(--down)}
+#qAll{padding:4px 0}
+#qX{background:var(--panel)!important;border:1px solid var(--line)!important;color:var(--muted)!important;font-weight:400!important}
 </style>
 </head>
 <body>
@@ -2307,6 +2322,8 @@ function tPlace(inst, side, kind, price, qty, tp, sl) {
   if (!s) return tSay(specErr[inst]?.msg || "종목 정보를 받는 중이에요 · 잠시 뒤 다시 눌러 주세요");
   if (!last) return tSay("시세를 받는 중이에요 · 잠시 뒤 다시 눌러 주세요");
   qty = roundQ(inst, qty);
+  const op = acct.pos[inst];
+  if (op && op.dir !== dir && Math.abs(qty - op.qty) < s.min) qty = op.qty;
   if (!(qty >= s.min) || qty <= 0) return tSay(`최소 주문 수량은 ${tqf(inst, s.min)} ${s.ccy}예요`);
   if (kind !== "market") {
     price = roundP(inst, price);
@@ -2318,7 +2335,13 @@ function tPlace(inst, side, kind, price, qty, tp, sl) {
   if (bad) return tSay(bad);
   const c = effCfg(inst), oq = openQty(inst, dir, qty), av = availBal();
   const need = at * oq / c.lev + at * qty * TAKER;
-  if (oq > 0 && need > av + 1e-9) return tSay(acct.dep ? `증거금이 모자라요 · 필요 ${usd(need)} / 가능 ${usd(Math.max(0, av))} USDT` : "자산 탭에서 시드머니를 먼저 충전하세요");
+  if (oq > 0 && need > av + 1e-9) {
+    if (acct.dep) return tSay(`증거금이 모자라요 · 필요 ${usd(need)} / 가능 ${usd(Math.max(0, av))} USDT`);
+    tr.tab = "assets";
+    tDock();
+    $("dFundIn").focus();
+    return tSay("시드머니를 먼저 충전하세요 · 자산 탭을 열었어요");
+  }
   if (kind === "market" || (kind === "limit" && (dir > 0 ? price >= last : price <= last))) {
     tFill(inst, dir, qty, last, TAKER, kindName(kind), { ...c, tp, sl });
     tNotify(`${inst} 체결`, `${kindName(kind)} ${sideName(dir)} ${tqf(inst, qty)} ${s.ccy} @ ${tpf(inst, last)}`, inst, "Pop", false);
@@ -2710,17 +2733,47 @@ function tMoveLine(inst, key, price) {
   tRender();
 }
 
-function panelQty(inst, price) {
-  const v = num($("tQty").value);
-  if (!(v > 0)) return 0;
-  return tr.unit === "coin" ? v : v / price;
+function amtK(inst, unit) { return unit === "margin" ? 1 / effCfg(inst).lev : 1 }
+
+function qtyFor(inst, dir, amt, unit, price) {
+  if (!(amt > 0) || !(price > 0)) return 0;
+  if (unit === "coin") return amt;
+  const k = amtK(inst, unit), p = acct.pos[inst];
+  if (!p || !dir || p.dir === dir) return amt / (price * k);
+  const full = p.qty * p.entry * k;
+  if (Math.abs(amt - full) <= full * 0.005) return p.qty;
+  return amt < full ? amt / (p.entry * k) : p.qty + (amt - full) / (price * k);
+}
+
+function amtFor(inst, dir, qty, unit, price) {
+  if (unit === "coin") return qty;
+  const k = amtK(inst, unit), p = acct.pos[inst];
+  if (!p || !dir || p.dir === dir) return qty * price * k;
+  const c = Math.min(qty, p.qty);
+  return c * p.entry * k + (qty - c) * price * k;
+}
+
+function panelQty(inst, price, dir) {
+  return qtyFor(inst, dir, num($("tQty").value), tr.unit === "coin" ? "coin" : "notional", price);
 }
 
 function curSlot() { return activeSlot && slots.includes(activeSlot) ? activeSlot : slots[0] }
 
+let quick = (() => {
+  try { const v = JSON.parse(store.get("okx.quick", "")); if (v && (v.unit === "margin" || v.unit === "coin")) return v } catch (e) {}
+  return { unit: "margin", amt: "" };
+})();
+
 function tMenuClose() {
   $("tctx").classList.remove("open");
   tr.menu = null;
+  tr.quick = null;
+}
+
+function tMenuPlace(x, y) {
+  const el = $("tctx");
+  el.style.left = Math.max(4, Math.min(x, innerWidth - el.offsetWidth - 4)) + "px";
+  el.style.top = Math.max(4, Math.min(y, innerHeight - el.offsetHeight - 4)) + "px";
 }
 
 function tMenu(S, e) {
@@ -2732,12 +2785,12 @@ function tMenu(S, e) {
   tRender();
   const s = specs[inst], last = lastOf(inst), pt = localPt(S.box, e), raw = S.candle.coordinateToPrice(pt.y);
   if (!s || !last || raw == null) { tSay(specErr[inst]?.msg || "시세를 받는 중이에요"); return }
-  const price = roundP(inst, raw), below = price < last, p = acct.pos[inst], qty = roundQ(inst, panelQty(inst, price)), P = tpf(inst, price), Q = tqf(inst, qty);
+  const price = roundP(inst, raw), below = price < last, p = acct.pos[inst], P = tpf(inst, price);
   const it = (a, color, text, em) => `<div class="mi" data-a="${a}"><i style="background:${color}"></i>${text}${em ? `<em>${em}</em>` : ""}</div>`, sep = '<div class="sep"></div>';
-  let h = `<div class="hd">${P} · 현재가보다 ${below ? "아래" : "위"} · ${qty > 0 ? `수량 ${Q} ${esc(s.ccy)}` : "오른쪽 패널에 수량을 넣으세요"}</div>`;
+  let h = `<div class="hd">${P} · 현재가보다 ${below ? "아래" : "위"}</div>`;
   h += below
-    ? it("buy-limit", C("--up"), `지정가 매수 · 롱 ${Q} @ ${P}`) + it("sell-stop", C("--down"), `스톱 매도 · 숏 ${Q} @ ${P}`)
-    : it("sell-limit", C("--down"), `지정가 매도 · 숏 ${Q} @ ${P}`) + it("buy-stop", C("--up"), `스톱 매수 · 롱 ${Q} @ ${P}`);
+    ? it("buy-limit", C("--up"), `지정가 매수 · 롱 @ ${P}`, "금액 입력 ›") + it("sell-stop", C("--down"), `스톱 매도 · 숏 @ ${P}`, "금액 입력 ›")
+    : it("sell-limit", C("--down"), `지정가 매도 · 숏 @ ${P}`, "금액 입력 ›") + it("buy-stop", C("--up"), `스톱 매수 · 롱 @ ${P}`, "금액 입력 ›");
   if (p) {
     const k = (p.dir > 0) === below ? "sl" : "tp";
     h += sep + it(k, k === "tp" ? PROFIT : LOSS, `${dirName(p.dir)} 포지션 ${k.toUpperCase()} → ${P}`, `${susd(upnlAt(p, price))} USDT`);
@@ -2748,16 +2801,96 @@ function tMenu(S, e) {
   const el = $("tctx");
   el.innerHTML = h;
   el.classList.add("open");
-  el.style.left = Math.max(4, Math.min(e.clientX + 2, innerWidth - el.offsetWidth - 4)) + "px";
-  el.style.top = Math.max(4, Math.min(e.clientY + 2, innerHeight - el.offsetHeight - 4)) + "px";
-  tr.menu = { S, inst, price, qty, oid: oh ? +oh.key.slice(1) : null };
+  tMenuPlace(e.clientX + 2, e.clientY + 2);
+  tr.menu = { S, inst, price, oid: oh ? +oh.key.slice(1) : null };
+}
+
+function tQuick(m, side, kind) {
+  const inst = m.inst, dir = side === "buy" ? 1 : -1, el = $("tctx"), r = el.getBoundingClientRect();
+  tr.quick = { inst, side, kind, dir };
+  el.innerHTML =
+    `<div class="qk"><div class="qh" style="color:${dir > 0 ? C("--up") : C("--down")}">${kindName(kind)} ${sideName(dir)} · ${dirName(dir)}<span>${esc(inst)}</span></div>` +
+    `<div class="fld"><span>${kind === "stop" ? "트리거" : "가격"}</span><input id="qPx" inputmode="decimal" autocomplete="off" spellcheck="false" value="${tpf(inst, m.price).replace(/,/g, "")}"><u>USDT</u></div>` +
+    `<div class="fld"><span id="qUl"></span><input id="qAmt" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="0"><button id="qUnit" type="button" title="증거금(USDT)과 코인 수량 사이를 바꿉니다"></button></div>` +
+    `<div class="pct" id="qPct"><button data-p="25">25%</button><button data-p="50">50%</button><button data-p="75">75%</button><button data-p="100">100%</button></div>` +
+    `<dl id="qCalc"></dl>` +
+    (acct.pos[inst] && acct.pos[inst].dir !== dir ? `<button id="qAll" class="mini" type="button">${dirName(-dir)} 포지션 전부 닫기</button>` : "") +
+    `<div class="qgo"><button id="qGo" class="${dir > 0 ? "b" : "s"}">${kindName(kind)} ${sideName(dir)}</button><button id="qX">취소</button></div></div>`;
+  $("qAmt").value = quick.unit === "margin" ? quick.amt || "" : "";
+  qCalc();
+  tMenuPlace(r.left, r.top);
+  $("qAmt").focus();
+  $("qAmt").select();
+}
+
+function qQty() {
+  const q = tr.quick, price = num($("qPx").value), a = num($("qAmt").value);
+  if (!q || !(price > 0) || !(a > 0)) return 0;
+  return qtyFor(q.inst, q.dir, a, quick.unit, price);
+}
+
+function qCalc() {
+  const q = tr.quick;
+  if (!q) return;
+  const inst = q.inst, s = specs[inst], c = effCfg(inst), price = num($("qPx").value), qty = roundQ(inst, qQty()), a = num($("qAmt").value);
+  $("qUl").textContent = quick.unit === "margin" ? "증거금" : "수량";
+  $("qUnit").textContent = quick.unit === "margin" ? "USDT" : s.ccy;
+  const small = a > 0 && qty < s.min, op = acct.pos[inst], opp = op && op.dir !== q.dir;
+  const cq = opp ? Math.min(qty, op.qty) : 0, nq = +(qty - cq).toFixed(8), U = esc(s.ccy);
+  const plan = !opp || !(qty > 0) ? "" :
+    `<dt>닫기</dt><dd>${dirName(op.dir)} ${tqf(inst, cq)} / ${tqf(inst, op.qty)} ${U}${cq >= op.qty ? " (전부)" : ""}</dd>` +
+    (nq > 0 ? `<dt>새로 열기</dt><dd>${dirName(q.dir)} ${tqf(inst, nq)} ${U}</dd>` : "");
+  $("qCalc").innerHTML =
+    `<dt>수량</dt><dd>${qty > 0 ? `${tqf(inst, qty)} ${U}` : "-"}</dd>` + plan +
+    `<dt>포지션 금액</dt><dd>${qty > 0 && price > 0 ? usd(qty * price) + " USDT" : "-"}</dd>` +
+    `<dt>레버리지</dt><dd>${c.lev}x ${c.mode === "cross" ? "교차" : "격리"}</dd>` +
+    `<dt>주문 가능</dt><dd>${usd(Math.max(0, availBal()))} USDT</dd>` +
+    (small ? `<dt class="w">최소 주문</dt><dd class="w">${tqf(inst, s.min)} ${esc(s.ccy)} (증거금 약 ${usd(s.min * price / c.lev)} USDT)</dd>` : "");
+}
+
+function qSubmit() {
+  const q = tr.quick;
+  if (!q) return;
+  const price = num($("qPx").value), qty = qQty();
+  if (!(price > 0)) { tSay("가격을 넣어 주세요"); $("qPx").focus(); return }
+  if (!(qty > 0)) { tSay(quick.unit === "margin" ? "넣을 증거금(USDT)을 입력하세요" : "수량을 입력하세요"); $("qAmt").focus(); return }
+  if (tPlace(q.inst, q.side, q.kind, price, qty, null, null) === false) return;
+  if (quick.unit === "margin") quick.amt = $("qAmt").value.trim();
+  store.set("okx.quick", JSON.stringify(quick));
+  tMenuClose();
 }
 
 $("tctx").addEventListener("click", e => {
+  if (tr.quick) {
+    const b = e.target.closest("button");
+    if (!b) return;
+    if (b.id === "qGo") qSubmit();
+    else if (b.id === "qAll") {
+      const op = acct.pos[tr.quick.inst];
+      if (!op) return;
+      $("qAmt").value = quick.unit === "coin" ? tqf(op.inst, op.qty) : amtFor(op.inst, tr.quick.dir, op.qty, "margin", num($("qPx").value)).toFixed(2);
+      qCalc();
+    }
+    else if (b.id === "qX") tMenuClose();
+    else if (b.id === "qUnit") {
+      const price = num($("qPx").value), qty = qQty();
+      quick.unit = quick.unit === "margin" ? "coin" : "margin";
+      if (qty > 0 && price > 0) $("qAmt").value = quick.unit === "coin" ? tqf(tr.quick.inst, roundQ(tr.quick.inst, qty)) : amtFor(tr.quick.inst, tr.quick.dir, qty, "margin", price).toFixed(2);
+      qCalc();
+      $("qAmt").focus();
+    } else if (b.dataset.p) {
+      const inst = tr.quick.inst, price = num($("qPx").value), lev = effCfg(inst).lev;
+      const margin = Math.max(0, availBal()) * +b.dataset.p / 100 / (1 + lev * TAKER);
+      $("qAmt").value = quick.unit === "margin" ? (Math.floor(margin * 100) / 100).toFixed(2) : price > 0 ? tqf(inst, roundQ(inst, margin * lev / price)) : "";
+      qCalc();
+    }
+    return;
+  }
   const mi = e.target.closest(".mi[data-a]"), m = tr.menu;
   if (!mi || !m) return;
-  tMenuClose();
   const a = mi.dataset.a;
+  if (/-(limit|stop)$/.test(a)) { const [side, kind] = a.split("-"); tQuick(m, side, kind); return }
+  tMenuClose();
   if (a === "tp" || a === "sl") tSetTpSl(m.inst, { [a]: m.price });
   else if (a === "cancel") tCancel(m.oid);
   else if (a === "hline") {
@@ -2765,14 +2898,18 @@ $("tctx").addEventListener("click", e => {
     drawingsOf(m.S.inst).push({ type: "h", price: +m.price.toFixed(m.S.prec) });
     saveDrawings(m.S.inst);
     syncDrawings(m.S.inst);
-  } else {
-    const [side, kind] = a.split("-");
-    tPlace(m.inst, side, kind, m.price, m.qty, null, null);
   }
 });
 
+$("tctx").addEventListener("input", () => qCalc());
+$("tctx").addEventListener("keydown", e => {
+  if (!tr.quick) return;
+  if (e.key === "Enter") { e.preventDefault(); qSubmit() }
+  else if (e.key === "Escape") { e.preventDefault(); tMenuClose() }
+});
+
 document.addEventListener("mousedown", e => { if (!$("tctx").contains(e.target)) tMenuClose() });
-document.addEventListener("wheel", () => tMenuClose(), { passive: true });
+document.addEventListener("wheel", e => { if (!tr.quick) tMenuClose() }, { passive: true });
 
 function tRender() {
   if (!tr.on) return;
@@ -2794,7 +2931,7 @@ function tPanel(S) {
   const inst = tr.inst, s = specs[inst], last = lastOf(inst), lk = inst ? lockedCfg(inst) : null, c = inst ? effCfg(inst) : { lev: 10, mode: "isolated" };
   $("tInst").textContent = inst || "종목 없음";
   $("tLast").textContent = last ? tpf(inst, last) : "-";
-  const err = !inst ? (S?.inst ? "만기 선물은 가상 거래를 할 수 없어요" : "칸에 종목을 띄우면 그 종목으로 주문합니다") : specErr[inst]?.msg;
+  const err = !inst ? (S?.inst ? "만기 선물은 가상 거래를 할 수 없어요" : "칸에 종목을 띄우면 그 종목으로 주문합니다") : specErr[inst]?.msg || (acct.dep ? "" : "가상 잔고가 0이에요 · 아래 자산 탭에서 시드머니를 먼저 충전하세요");
   const notes = [];
   if (inst && S?.inst !== inst) notes.push(`현물 칸이라 무기한(${inst})으로 주문합니다`);
   if (lk) notes.push("포지션·미체결 주문이 있어 레버리지·마진 방식이 고정됩니다");
@@ -2979,7 +3116,7 @@ function tSubmit(side) {
   if (!inst) return;
   const kind = tr.otype, price = kind === "market" ? last : num($("tPx").value);
   if (!(price > 0)) { tSay("가격을 넣어 주세요"); return }
-  const qty = panelQty(inst, price);
+  const qty = panelQty(inst, price, side === "buy" ? 1 : -1);
   if (!(qty > 0)) { tSay("수량을 넣어 주세요"); $("tQty").focus(); return }
   let tp = null, sl = null;
   if ($("tTpslOn").checked) {
