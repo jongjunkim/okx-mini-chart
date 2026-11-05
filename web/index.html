@@ -17,6 +17,10 @@ nav button.active{color:var(--draw);border-color:var(--draw)}
 #dot.on{background:#2fbf71}
 #hint{display:none;position:fixed;left:50%;bottom:44px;transform:translateX(-50%);z-index:30;max-width:calc(100% - 16px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;background:#161a21eb;border:1px solid var(--draw);border-radius:4px;padding:3px 8px;color:var(--draw);font-size:11px}
 body.hinting #hint{display:block}
+#shotPick{display:none;position:fixed;inset:0;z-index:50;cursor:crosshair}
+#shotPick.open{display:block}
+#shotFrame{position:fixed;border:2px solid #ff3b30;background:#ff3b3010;pointer-events:none}
+#shotPick em{position:fixed;left:50%;bottom:44px;transform:translateX(-50%);max-width:calc(100% - 16px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;font-style:normal;background:#161a21eb;border:1px solid #ff3b30;border-radius:4px;padding:3px 8px;color:#ff6b61;font-size:11px}
 body.drawing .c *{cursor:crosshair!important}
 .c.hov-ns *{cursor:ns-resize!important}
 .c.hov-pt *{cursor:pointer!important}
@@ -140,7 +144,13 @@ main{flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto}
 #work>main{min-width:0}
 #trade{display:none;width:250px;flex:none;flex-direction:column;gap:8px;padding:8px 10px;border-left:1px solid var(--line);overflow-y:auto}
 body.trading #trade{display:flex}
-#trade .th{display:flex;align-items:baseline;gap:8px}
+body.trading.tfold #trade{display:none}
+#tStrip{display:none;width:24px;flex:none;flex-direction:column;align-items:center;gap:10px;padding-top:8px;border-left:1px solid var(--line);background:var(--head);color:var(--muted);cursor:pointer;user-select:none}
+#tStrip:hover{color:var(--text)}
+#tStrip .v{writing-mode:vertical-rl;letter-spacing:2px;font-size:11px}
+body.trading.tfold #tStrip{display:flex}
+#trade .th{display:flex;align-items:center;gap:8px}
+#tFold{margin-right:-4px}
 #trade .th b{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #trade .th span{margin-left:auto;font-weight:600;font-variant-numeric:tabular-nums}
 #tMsg{font-size:11px;color:var(--muted);line-height:1.4}
@@ -182,11 +192,10 @@ body.trading #trade{display:flex}
 .go button:disabled{opacity:.4;cursor:default}
 #tBuy{background:var(--up)}
 #tSell{background:var(--down)}
-#balChip{display:none;margin-left:auto;align-items:center;gap:5px;padding:2px 6px;border:1px solid transparent;border-radius:4px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;cursor:pointer}
+#balChip{display:flex;margin-left:auto;align-items:center;gap:5px;padding:2px 6px;border:1px solid transparent;border-radius:4px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;cursor:pointer}
 #balChip:hover{border-color:var(--line)}
 #balChip b{color:var(--text);font-weight:600}
-body.trading #balChip{display:flex}
-body.trading #dot{margin-left:8px}
+nav #dot{margin-left:8px}
 #dock{display:none;flex:none;height:190px;flex-direction:column;border-top:1px solid var(--line)}
 body.trading #dock{display:flex}
 #dTabs{display:flex;gap:2px;flex:none;padding:2px 8px 0;border-bottom:1px solid var(--line);background:var(--head)}
@@ -249,7 +258,7 @@ body.trading #dock{display:flex}
 </head>
 <body>
 <nav>
-  <button class="tool" data-mode="h" title="수평선(지지·저항): 누른 뒤 차트를 클릭">수평</button><button class="tool" data-mode="t" title="추세선: 누른 뒤 두 점을 클릭">추세</button><button class="tool" data-mode="r" title="가격 범위: 누른 뒤 두 점을 클릭하면 가격 차이·변동률·봉 수를 보여줍니다">범위</button><button class="tool" data-mode="L" title="롱 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">롱</button><button class="tool" data-mode="S" title="숏 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">숏</button><button class="tool" data-mode="P" title="리플레이: 누른 뒤 시작할 봉을 클릭. 그 봉까지만 보이고 한 봉씩 넘겨 봅니다">리플레이</button><button id="indBtn" title="이동평균·볼린저밴드·RSI">지표</button><button id="topBtn" title="24시간 거래대금 상위 10종목. 누르면 선택한 칸에 띄웁니다">TOP10</button><button id="shotBtn" title="화면 캡처(⌘S): 바탕화면에 저장하고 클립보드에도 복사합니다">캡처</button><button id="alBtn" title="이동평균 정배열·우상향 알림"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>알림<span id="alBadge"></span></button><button id="tradeBtn" title="가상 거래: 충전한 시드머니로 레버리지 매매를 연습합니다. 실제 주문은 나가지 않습니다">거래</button>
+  <button class="tool" data-mode="h" title="수평선(지지·저항): 누른 뒤 차트를 클릭">수평</button><button class="tool" data-mode="t" title="추세선: 누른 뒤 두 점을 클릭">추세</button><button class="tool" data-mode="r" title="가격 범위: 누른 뒤 두 점을 클릭하면 가격 차이·변동률·봉 수를 보여줍니다">범위</button><button class="tool" data-mode="L" title="롱 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">롱</button><button class="tool" data-mode="S" title="숏 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">숏</button><button class="tool" data-mode="P" title="리플레이: 누른 뒤 시작할 봉을 클릭. 그 봉까지만 보이고 한 봉씩 넘겨 봅니다">리플레이</button><button id="indBtn" title="이동평균·볼린저밴드·RSI">지표</button><button id="topBtn" title="24시간 거래대금 상위 10종목. 누르면 선택한 칸에 띄웁니다">TOP10</button><button id="shotBtn" title="차트 캡처(⌘S): 칸이 여러 개면 찍을 차트를 클릭합니다. 창 전체는 ⌘⇧S. 바탕화면에 저장하고 클립보드에도 복사합니다">캡처</button><button id="alBtn" title="이동평균 정배열·우상향 알림"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>알림<span id="alBadge"></span></button><button id="tradeBtn" title="가상 거래 주문 패널·포지션 창 열고 닫기. 차트 우클릭 주문과 포지션 선은 패널을 닫아도 쓸 수 있습니다. 실제 주문은 나가지 않습니다">거래</button>
   <span id="balChip" title="자산 탭 열기">가상 잔고 <b id="balTxt">0.00</b> USDT</span>
   <span id="dot" title="실시간 연결"></span>
   <div id="indp"></div>
@@ -259,7 +268,7 @@ body.trading #dock{display:flex}
 <div id="work">
 <main id="main"><button id="add">＋ 종목 추가</button></main>
 <aside id="trade">
-  <div class="th"><b id="tInst">-</b><span id="tLast">-</span></div>
+  <div class="th"><b id="tInst">-</b><span id="tLast">-</span><button id="tFold" class="ic" type="button" title="주문 패널 접기 (⌘])">›</button></div>
   <div id="tMsg"></div>
   <div class="seg" id="tMode"><button data-v="isolated" title="포지션마다 증거금을 따로 둡니다. 청산되면 그 증거금만 잃습니다">격리</button><button data-v="cross" title="잔고 전체를 증거금으로 씁니다. 청산되면 교차 포지션을 모두 잃습니다">교차</button></div>
   <div class="tr2">레버리지<span id="tLevTxt">10x</span></div>
@@ -274,6 +283,7 @@ body.trading #dock{display:flex}
   <dl id="tCalc"></dl>
   <div class="go"><button id="tBuy">매수 · 롱</button><button id="tSell">매도 · 숏</button></div>
 </aside>
+<div id="tStrip" title="주문 패널 펼치기 (⌘])"><span>‹</span><span class="v">주문</span></div>
 </div>
 <div id="dock">
   <div id="dTabs"><button data-t="pos">포지션</button><button data-t="open">미체결</button><button data-t="hist">체결 내역</button><button data-t="assets">자산</button><span id="dSum"></span></div>
@@ -295,6 +305,7 @@ body.trading #dock{display:flex}
 </div>
 <div id="tctx"></div>
 <div id="hint"></div>
+<div id="shotPick"><div id="shotFrame" hidden></div><em>캡처할 차트를 클릭하세요 · Esc 취소</em></div>
 <div id="toast"><span id="toastMsg"></span><button id="undo">되돌리기</button></div>
 <script>
 const OKX_BAR = { "1m": "1m", "5m": "5m", "15m": "15m", "1h": "1H", "4h": "4H", "1d": "1D" };
@@ -683,7 +694,7 @@ function makeSlot(cfg, beforeEl) {
     if (e.buttons === 1 && !drag && !mode) S.rpFreeze = null;
   });
   S.box.addEventListener("wheel", () => { S.rpFreeze = null }, { passive: true });
-  el.addEventListener("pointerdown", () => { activeSlot = S; updateClearBtn(); if (tr.on) tRender() }, true);
+  el.addEventListener("pointerdown", () => { activeSlot = S; updateClearBtn(); tRender() }, true);
 
   wireSymbolInput(S);
   S.tfEl.addEventListener("change", () => {
@@ -1074,10 +1085,57 @@ window.prepShot = () => {
 };
 window.shotDone = (name, err) => showToast(err ? `캡처 실패: ${err}` : `저장하고 복사했어요 · ${name}`, false);
 
-$("shotBtn").onclick = () => {
-  try { window.webkit.messageHandlers.win.postMessage({ shot: true }) }
-  catch (e) { showToast("캡처는 앱에서만 돼요", false) }
-};
+let shotPick = null;
+
+function shotRect(el) {
+  const r = el.getBoundingClientRect(), x = Math.max(0, r.left), y = Math.max(0, r.top);
+  return { x, y, w: Math.min(innerWidth, r.right) - x, h: Math.min(innerHeight, r.bottom) - y };
+}
+
+function shootSlot(S) {
+  window.prepShot();
+  if (!post({ shot: { ...shotRect(S.el), name: S.inst || "" } })) showToast("캡처는 앱에서만 돼요", false);
+}
+
+function startShot() {
+  if (shotPick) { endShotPick(); return }
+  if (slots.length === 1) { shootSlot(slots[0]); return }
+  window.prepShot();
+  shotPick = { S: null };
+  $("shotFrame").hidden = true;
+  $("shotPick").classList.add("open");
+  $("shotBtn").classList.add("active");
+}
+
+function endShotPick() {
+  shotPick = null;
+  $("shotPick").classList.remove("open");
+  $("shotBtn").classList.remove("active");
+}
+
+function shotHover(e) {
+  const S = slots.find(x => {
+    const r = x.el.getBoundingClientRect();
+    return e.clientX >= r.left && e.clientX < r.right && e.clientY >= r.top && e.clientY < r.bottom;
+  }) || null, f = $("shotFrame");
+  shotPick.S = S;
+  f.hidden = !S;
+  if (S) {
+    const r = shotRect(S.el);
+    Object.assign(f.style, { left: r.x + "px", top: r.y + "px", width: r.w + "px", height: r.h + "px" });
+  }
+}
+
+$("shotPick").addEventListener("mousemove", shotHover);
+$("shotPick").addEventListener("mousedown", e => {
+  e.preventDefault();
+  shotHover(e);
+  const S = shotPick.S;
+  endShotPick();
+  if (S) shootSlot(S);
+});
+
+$("shotBtn").onclick = startShot;
 
 $("undo").addEventListener("click", () => {
   if (!undoInfo || slots.length >= MAX_SLOTS) return;
@@ -1736,6 +1794,7 @@ document.addEventListener("mousedown", e => {
 });
 
 document.addEventListener("keydown", e => {
+  if (shotPick && e.key === "Escape") { endShotPick(); return }
   const typing = /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName || "");
   if ((e.key === "Backspace" || e.key === "Delete") && selected && !typing) {
     e.preventDefault();
@@ -2111,9 +2170,9 @@ function watchdog() {
   }
 }
 
-const MAKER = 0.0002, TAKER = 0.0005, TRADE_W = 250, DOCK_H = 190, HIST_MAX = 300;
+const MAKER = 0.0002, TAKER = 0.0005, TRADE_W = 250, STRIP_W = 24, DOCK_H = 190, HIST_MAX = 300;
 const WS_PUB = "wss://ws.okx.com/ws/v5/public";
-const tr = { on: store.get("okx.trade.on", "") === "1", tab: "pos", unit: "coin", otype: "limit", inst: null, newInst: false, editing: null, menu: null, sig: {}, dirty: false, caught: 0, funding: false };
+const tr = { on: store.get("okx.trade.on", "") === "1", fold: store.get("okx.trade.fold", "") === "1", tab: "pos", unit: "coin", otype: "limit", inst: null, newInst: false, editing: null, menu: null, sig: {}, dirty: false, caught: 0, funding: false };
 const specs = {}, specP = {}, specErr = {}, quotes = {};
 let acct = loadAcct(), tws = null, tsubs = new Set(), tpingT = null, treconT = null, catching = false, tdrag = null, resetT = null;
 
@@ -2337,6 +2396,7 @@ function tPlace(inst, side, kind, price, qty, tp, sl) {
   const need = at * oq / c.lev + at * qty * TAKER;
   if (oq > 0 && need > av + 1e-9) {
     if (acct.dep) return tSay(`증거금이 모자라요 · 필요 ${usd(need)} / 가능 ${usd(Math.max(0, av))} USDT`);
+    if (!tr.on) setTrade(true, true);
     tr.tab = "assets";
     tDock();
     $("dFundIn").focus();
@@ -2475,7 +2535,7 @@ async function tFunding() {
 
 function tWanted() {
   const s = new Set([...Object.keys(acct.pos), ...acct.orders.map(o => o.inst)]);
-  if (tr.on && tr.inst) s.add(tr.inst);
+  if (tr.inst) s.add(tr.inst);
   return s;
 }
 
@@ -2524,7 +2584,7 @@ async function tTicker(inst) {
     const t = (await getJson(`${API}/market/ticker?instId=${inst}`))[0];
     const q = quotes[inst] || (quotes[inst] = {});
     if (t && !q.last) q.last = +t.last;
-    if (tr.on) tRender();
+    tRender();
   } catch (e) {}
 }
 
@@ -2564,7 +2624,7 @@ class TradeLayer {
     target.useMediaCoordinateSpace(({ context: ctx, mediaSize }) => {
       const S = this.S, W = mediaSize.width, H = mediaSize.height;
       S.thits = [];
-      if (!tr.on || S.rp || !S.inst) return;
+      if (S.rp || !S.inst) return;
       const inst = tradeInstOf(S.inst), font = "-apple-system, BlinkMacSystemFont, sans-serif";
       const placed = [];
       let up = 0, dn = 0;
@@ -2626,7 +2686,7 @@ class TradeLayer {
 }
 
 function tAxis(S) {
-  const want = tr.on && !S.rp && S.inst ? tLines(tradeInstOf(S.inst)) : [], keys = new Set();
+  const want = !S.rp && S.inst ? tLines(tradeInstOf(S.inst)) : [], keys = new Set();
   for (const L of want) {
     keys.add(L.key);
     const o = { price: L.price, color: L.color, lineVisible: false, axisLabelVisible: true, title: "" }, pl = S.tpl.get(L.key);
@@ -2640,7 +2700,7 @@ function tRepaint(inst) {
 }
 
 function tHover(S, pt) {
-  if (!tr.on || S.rp || !S.thits.length) return null;
+  if (S.rp || !S.thits.length) return null;
   if (S.thits.some(h => h.xr && inside(pt, ...h.xr))) return "x";
   return S.thits.some(h => h.drag && Math.abs(pt.y - h.y) < 5) ? "ns" : null;
 }
@@ -2651,7 +2711,7 @@ function tKeyPrice(inst, key) {
 }
 
 function tPointerDown(S, pt, e) {
-  if (!tr.on || S.rp || !S.thits.length) return false;
+  if (S.rp || !S.thits.length) return false;
   const inst = tradeInstOf(S.inst), xh = S.thits.find(h => h.xr && inside(pt, ...h.xr));
   if (xh) { e.stopPropagation(); tRemoveLine(inst, xh.key); return true }
   let best = null, bd = 5;
@@ -2777,7 +2837,7 @@ function tMenuPlace(x, y) {
 }
 
 function tMenu(S, e) {
-  if (!tr.on || S.rp || !S.ready) return;
+  if (S.rp || !S.ready) return;
   const inst = tradeInstOf(S.inst);
   if (!inst) return;
   e.preventDefault();
@@ -2912,7 +2972,6 @@ document.addEventListener("mousedown", e => { if (!$("tctx").contains(e.target))
 document.addEventListener("wheel", e => { if (!tr.quick) tMenuClose() }, { passive: true });
 
 function tRender() {
-  if (!tr.on) return;
   const S = curSlot(), inst = tradeInstOf(S?.inst);
   if (inst !== tr.inst) {
     tr.inst = inst;
@@ -2920,9 +2979,9 @@ function tRender() {
     if (inst) tTicker(inst);
     syncTradeSubs();
   }
-  if (inst && !specs[inst] && !specP[inst] && !(Date.now() - (specErr[inst]?.at || 0) < 15000)) loadSpec(inst).then(() => tr.on && tRender());
-  tPanel(S);
-  tDock();
+  if (inst && !specs[inst] && !specP[inst] && !(Date.now() - (specErr[inst]?.at || 0) < 15000)) loadSpec(inst).then(() => tRender());
+  if (tr.on && !tr.fold) tPanel(S);
+  if (tr.on) tDock();
   $("balTxt").textContent = usd(equity());
   tRepaint();
 }
@@ -3053,16 +3112,34 @@ function setTrade(on, resize) {
   store.set("okx.trade.on", on ? "1" : "0");
   document.body.classList.toggle("trading", on);
   $("tradeBtn").classList.toggle("active", on);
-  if (resize) post({ dx: on ? TRADE_W : -TRADE_W, dy: on ? DOCK_H : -DOCK_H });
-  if (!on) { tMenuClose(); tr.inst = null }
+  document.body.classList.toggle("tfold", tr.fold);
+  const w = tr.fold ? STRIP_W : TRADE_W;
+  if (resize) post({ dx: on ? w : -w, dy: on ? DOCK_H : -DOCK_H });
   tr.sig = {};
   tRender();
-  tRepaint();
-  syncTradeSubs();
+}
+
+function setFold(fold) {
+  if (!tr.on || fold === tr.fold) return;
+  tr.fold = fold;
+  store.set("okx.trade.fold", fold ? "1" : "0");
+  document.body.classList.toggle("tfold", fold);
+  post({ dx: fold ? STRIP_W - TRADE_W : TRADE_W - STRIP_W });
+  tr.sig = {};
+  tRender();
+}
+
+function toggleTradeFold() {
+  if (tr.on) { setFold(!tr.fold); return }
+  tr.fold = false;
+  store.set("okx.trade.fold", "0");
+  setTrade(true, true);
 }
 
 $("tradeBtn").onclick = () => setTrade(!tr.on, true);
-$("balChip").onclick = () => { tr.tab = "assets"; tDock() };
+$("tFold").onclick = () => setFold(true);
+$("tStrip").onclick = () => setFold(false);
+$("balChip").onclick = () => { if (!tr.on) setTrade(true, true); tr.tab = "assets"; tDock() };
 
 $("tMode").addEventListener("click", e => {
   const b = e.target.closest("button[data-v]"), inst = tr.inst;
@@ -3220,7 +3297,7 @@ slots.forEach(loadSlot);
 connect();
 for (const inst of tWanted()) loadSpec(inst);
 setTrade(tr.on, false);
-setInterval(() => { if (tr.on) tRender() }, 500);
+setInterval(tRender, 500);
 setInterval(() => { if (tr.dirty) saveAcct() }, 5000);
 setInterval(tFunding, 300000);
 setInterval(() => { refreshTicker(); if (topp.classList.contains("open")) renderTop() }, 10000);

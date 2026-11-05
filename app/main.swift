@@ -57,7 +57,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.name == "win", let body = message.body as? [String: Any] else { return }
-        if body["shot"] as? Bool == true { capture(); return }
+        if let s = body["shot"] as? [String: Any] {
+            let r = CGRect(x: s["x"] as? Double ?? 0, y: s["y"] as? Double ?? 0, width: s["w"] as? Double ?? 0, height: s["h"] as? Double ?? 0)
+            snap(r.width > 1 && r.height > 1 ? r : nil, s["name"] as? String ?? "")
+            return
+        }
         if let n = body["notify"] as? [String: Any] { notify(n); return }
         if body["notifyAuth"] as? Bool == true { requestNotifyAuth { _ in }; return }
         if let s = body["sound"] as? String { NSSound(named: NSSound.Name(s))?.play(); return }
@@ -66,33 +70,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         resizeWindow(dx: CGFloat(dx), dy: CGFloat(dy))
     }
 
-    // 창 내용을 PNG 로 바탕화면(~/Desktop)에 저장하고 클립보드에도 넣는다(옵시디언 등에 바로 붙여넣기).
-    @objc private func capture() {
-        webView.evaluateJavaScript("prepShot()") { [weak self] result, _ in
-            guard let self else { return }
-            let insts = (result as? String) ?? ""
-            // 토스트·선택 표시가 사라진 화면이 그려질 시간을 준다
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                self.webView.takeSnapshot(with: nil) { image, error in
-                    guard let image, let tiff = image.tiffRepresentation,
-                          let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else {
-                        self.shotDone(nil, error?.localizedDescription ?? "이미지를 만들지 못했어요")
-                        return
-                    }
-                    let pb = NSPasteboard.general
-                    pb.clearContents()
-                    pb.setData(png, forType: .png)
+    // 칸 하나(또는 창 전체)를 PNG 로 바탕화면(~/Desktop)에 저장하고 클립보드에도 넣는다(옵시디언 등에 바로 붙여넣기).
+    @objc private func capture() { webView.evaluateJavaScript("startShot()") }
 
-                    let fmt = DateFormatter()
-                    fmt.dateFormat = "yyyy-MM-dd HHmmss"
-                    let name = "OKX \(fmt.string(from: Date()))\(insts.isEmpty ? "" : " " + insts).png"
-                    let dir = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask)[0]
-                    do {
-                        try png.write(to: dir.appendingPathComponent(name))
-                        self.shotDone(name, nil)
-                    } catch {
-                        self.shotDone(nil, "클립보드엔 복사됐지만 저장 실패: \(error.localizedDescription)")
-                    }
+    @objc private func captureWindow() {
+        webView.evaluateJavaScript("prepShot()") { [weak self] result, _ in
+            self?.snap(nil, (result as? String) ?? "")
+        }
+    }
+
+    private func snap(_ rect: CGRect?, _ insts: String) {
+        // 토스트·선택 표시가 사라진 화면이 그려질 시간을 준다
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            let cfg = WKSnapshotConfiguration()
+            if let rect { cfg.rect = rect }
+            self.webView.takeSnapshot(with: cfg) { image, error in
+                guard let image, let tiff = image.tiffRepresentation,
+                      let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else {
+                    self.shotDone(nil, error?.localizedDescription ?? "이미지를 만들지 못했어요")
+                    return
+                }
+                let pb = NSPasteboard.general
+                pb.clearContents()
+                pb.setData(png, forType: .png)
+
+                let fmt = DateFormatter()
+                fmt.dateFormat = "yyyy-MM-dd HHmmss"
+                let name = "OKX \(fmt.string(from: Date()))\(insts.isEmpty ? "" : " " + insts).png"
+                let dir = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask)[0]
+                do {
+                    try png.write(to: dir.appendingPathComponent(name))
+                    self.shotDone(name, nil)
+                } catch {
+                    self.shotDone(nil, "클립보드엔 복사됐지만 저장 실패: \(error.localizedDescription)")
                 }
             }
         }
@@ -160,6 +170,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
 
     @objc private func reload() { webView.reload() }
 
+    @objc private func toggleTradeFold() { webView.evaluateJavaScript("toggleTradeFold()") }
+
     @objc private func togglePin() {
         let on = !UserDefaults.standard.bool(forKey: pinKey)
         UserDefaults.standard.set(on, forKey: pinKey)
@@ -223,9 +235,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         pinItem = NSMenuItem(title: "항상 위에 표시", action: #selector(togglePin), keyEquivalent: "t")
         pinItem.target = self
         view.addItem(pinItem)
-        let shotItem = NSMenuItem(title: "화면 캡처", action: #selector(capture), keyEquivalent: "s")
+        let shotItem = NSMenuItem(title: "차트 캡처", action: #selector(capture), keyEquivalent: "s")
         shotItem.target = self
         view.addItem(shotItem)
+        let winShotItem = NSMenuItem(title: "창 전체 캡처", action: #selector(captureWindow), keyEquivalent: "S")
+        winShotItem.target = self
+        view.addItem(winShotItem)
+        let foldItem = NSMenuItem(title: "주문 패널 접기·펼치기", action: #selector(toggleTradeFold), keyEquivalent: "]")
+        foldItem.target = self
+        view.addItem(foldItem)
         view.addItem(.separator())
         let more = NSMenuItem(title: "더 투명하게", action: #selector(moreTransparent), keyEquivalent: "-")
         more.keyEquivalentModifierMask = [.command, .option]
