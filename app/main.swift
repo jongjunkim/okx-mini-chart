@@ -61,8 +61,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         if let n = body["notify"] as? [String: Any] { notify(n); return }
         if body["notifyAuth"] as? Bool == true { requestNotifyAuth { _ in }; return }
         if let s = body["sound"] as? String { NSSound(named: NSSound.Name(s))?.play(); return }
-        guard let dy = body["dy"] as? Double, dy.isFinite else { return }
-        resizeWindow(by: CGFloat(dy))
+        let dx = body["dx"] as? Double ?? 0, dy = body["dy"] as? Double ?? 0
+        guard dx.isFinite, dy.isFinite, dx != 0 || dy != 0 else { return }
+        resizeWindow(dx: CGFloat(dx), dy: CGFloat(dy))
     }
 
     // 창 내용을 PNG 로 바탕화면(~/Desktop)에 저장하고 클립보드에도 넣는다(옵시디언 등에 바로 붙여넣기).
@@ -144,14 +145,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         completionHandler()
     }
 
-    private func resizeWindow(by dy: CGFloat) {
+    private func resizeWindow(dx: CGFloat, dy: CGFloat) {
         let visible = window.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? window.frame
         var frame = window.frame
         let height = min(max(frame.height + dy, window.minSize.height), visible.height)
+        let width = min(max(frame.width + dx, window.minSize.width), visible.width)
         let top = frame.maxY
-        frame.size.height = height
+        frame.size = NSSize(width: width, height: height)
         frame.origin.y = max(top - height, visible.minY)
         if frame.maxY > visible.maxY { frame.origin.y = visible.maxY - height }
+        if frame.maxX > visible.maxX { frame.origin.x = max(visible.minX, visible.maxX - width) }
         window.setFrame(frame, display: true, animate: true)
     }
 
