@@ -28,6 +28,23 @@ body.drawing .c *{cursor:crosshair!important}
 .c.hov-ew *{cursor:ew-resize!important}
 #indp{position:absolute;right:8px;top:100%;margin-top:2px;width:236px;background:var(--panel);border:1px solid #3a414d;border-radius:6px;padding:6px 8px;z-index:30;display:none;box-shadow:0 8px 24px #0009}
 #indp.open{display:block}
+#btres{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;background:#0009;padding:16px}
+#btres.open{display:flex}
+#btres .box{width:min(620px,100%);max-height:100%;display:flex;flex-direction:column;background:var(--panel);border:1px solid #3a414d;border-radius:8px;box-shadow:0 12px 32px #000a}
+#btres .hd{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--line);font-size:13px}
+#btres .hd button{margin-left:auto;background:none;border:0;color:var(--muted);font-size:18px;line-height:1;cursor:pointer}
+#btres .hd button:hover{color:var(--text)}
+#btres .m{color:var(--muted);font-weight:400}
+#btres .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px 14px;padding:10px 12px;border-bottom:1px solid var(--line)}
+#btres .kv div{display:flex;flex-direction:column;gap:2px}
+#btres .kv b{font-weight:600;font-variant-numeric:tabular-nums;line-height:1.45}
+#btres .tw{overflow:auto;min-height:0}
+#btres table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+#btres th{position:sticky;top:0;background:var(--panel);color:var(--muted);font-weight:500;text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+#btres td{padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top;white-space:nowrap;line-height:1.4}
+#btres .r{text-align:right}
+#btres tr.open td{background:#1d232d}
+#btres .ft{padding:7px 12px;font-size:11px}
 #topp{position:absolute;right:8px;top:100%;margin-top:2px;width:min(360px,calc(100vw - 16px));background:var(--panel);border:1px solid #3a414d;border-radius:6px;padding:4px 0;z-index:30;display:none;box-shadow:0 8px 24px #0009}
 #topp.open{display:block}
 #topp .hd{display:flex;align-items:center;gap:4px;padding:2px 8px 6px;border-bottom:1px solid var(--line);margin-bottom:2px;color:var(--muted);font-size:11px}
@@ -326,6 +343,7 @@ body.trading #dock{display:flex}
 <div id="tctx"></div>
 <div id="hint"></div>
 <div id="shotPick"><div id="shotFrame" hidden></div><em>캡처할 차트를 클릭하세요 · Esc 취소</em></div>
+<div id="btres"></div>
 <div id="toast"><span id="toastMsg"></span><button id="undo">되돌리기</button></div>
 <script>
 const OKX_BAR = { "1m": "1m", "5m": "5m", "15m": "15m", "1h": "1H", "4h": "4H", "1d": "1D" };
@@ -1721,7 +1739,7 @@ function btStart(S) {
   btSeed = seed; btLev = lev;
   store.set("okx.bt.seed", String(seed));
   store.set("okx.bt.lev", String(lev));
-  S.bt = { seed, lev, cash: seed, pos: null, pend: null, trades: [], marks: [], peak: seed, mdd: 0, fees: 0 };
+  S.bt = { seed, lev, cash: seed, pos: null, pend: null, trades: [], marks: [], peak: seed, mdd: 0, fees: 0, t0: S.rp.T, inst: S.inst };
   btRender(S);
   showToast(`${usd(seed)} USD · ${lev}x 로 시작해요 · ▶ 재생하면서 매수·매도를 누르세요`, false);
 }
@@ -1739,19 +1757,19 @@ function btOrder(S, side) {
   showToast(`${what} · 다음 봉 시가에 체결돼요${S.rp.playT ? "" : " · ▶ 재생이나 한 봉 ▷을 누르세요"}`, false);
 }
 
-function btClose(S, px, t, why) {
+function btClose(S, px, t, why, ft) {
   const B = S.bt, p = B.pos, fee = px * p.qty * TAKER, pnl = btUpnl(p, px);
   B.cash += Math.max(0, p.margin + pnl - fee);
   B.fees += fee;
   const net = pnl - fee - p.fee;
-  B.trades.push({ dir: p.dir, entry: p.entry, exit: px, net, why });
+  B.trades.push({ dir: p.dir, lev: p.lev, entry: p.entry, exit: px, net, margin: p.margin, why, t0: p.t, t1: ft });
   B.marks.push({ t, dir: -p.dir, text: `${why} ${susd(net)}` });
   B.pos = null;
 }
 
-function btFill(S, side, px, t) {
+function btFill(S, side, px, t, ft) {
   const B = S.bt, p = B.pos;
-  if (side === 0 || (p && p.dir !== side)) { if (p) btClose(S, px, t, "닫기"); return }
+  if (side === 0 || (p && p.dir !== side)) { if (p) btClose(S, px, t, "정리", ft); return }
   const margin = B.cash * btPct / 100 / (1 + B.lev * TAKER);
   if (margin < 1) { showToast("가용 잔고가 모자라 주문을 건너뛰었어요", false); return }
   const qty = margin * B.lev / px, fee = px * qty * TAKER;
@@ -1760,13 +1778,13 @@ function btFill(S, side, px, t) {
   if (p) {
     p.entry = (p.entry * p.qty + px * qty) / (p.qty + qty);
     p.qty += qty; p.margin += margin; p.fee += fee;
-  } else B.pos = { dir: side, entry: px, qty, margin, fee, lev: B.lev };
+  } else B.pos = { dir: side, entry: px, qty, margin, fee, lev: B.lev, t: ft };
   B.marks.push({ t, dir: side, text: `${p ? "추가" : side > 0 ? "롱" : "숏"} ${B.lev}x` });
 }
 
 function btLiquidate(S, px, t) {
   const B = S.bt, p = B.pos;
-  B.trades.push({ dir: p.dir, entry: p.entry, exit: px, net: -p.margin - p.fee, why: "강제청산" });
+  B.trades.push({ dir: p.dir, lev: p.lev, entry: p.entry, exit: px, net: -p.margin - p.fee, margin: p.margin, why: "강제청산", t0: p.t, t1: t - TZ });
   B.marks.push({ t, dir: -p.dir, text: `강제청산 ${susd(-p.margin - p.fee)}` });
   B.pos = null;
   showToast(`강제 청산 · ${dirName(p.dir)} ${p.lev}x 증거금 ${usd(p.margin)} USD를 잃었어요`, false);
@@ -1780,7 +1798,11 @@ function btOnBar(S, b) {
   const n = B.marks.length, hit = (p, x) => p.dir > 0 ? x <= btLiq(p) : x >= btLiq(p);
   if (B.pos && hit(B.pos, b.open)) btLiquidate(S, b.open, b.time);
   // 간격을 굵게 바꾸면 다음 봉 시가가 주문 시각보다 앞설 수 있다. 그 가격엔 살 수 없었으니 그 봉 종가에 체결한다.
-  if (B.pend) { btFill(S, B.pend.side, closeOf(S, b) - SEC[S.tf] >= B.pend.T ? b.open : b.close, b.time); B.pend = null }
+  if (B.pend) {
+    const o = closeOf(S, b) - SEC[S.tf], atOpen = o >= B.pend.T;
+    btFill(S, B.pend.side, atOpen ? b.open : b.close, b.time, atOpen ? o : closeOf(S, b));
+    B.pend = null;
+  }
   if (B.pos && hit(B.pos, B.pos.dir > 0 ? b.low : b.high)) btLiquidate(S, btLiq(B.pos), b.time);
   const eq = btEquity(B, b.close);
   B.peak = Math.max(B.peak, eq);
@@ -1824,12 +1846,52 @@ function btRender(S) {
     (p ? `\n진입 ${fmt(S, p.entry)} · 강제청산가 ${fmt(S, btLiq(p))} · 증거금 ${usd(p.margin)}` : "");
 }
 
+const btWhen = sec => rpStamp(sec);
+
+function btSpan(sec) {
+  const d = Math.floor(sec / 86400), h = Math.floor(sec % 86400 / 3600), m = Math.round(sec % 3600 / 60);
+  return d ? `${d}일 ${h}시간` : h ? `${h}시간 ${m}분` : `${m}분`;
+}
+
+// 끝내기·초기화·종목 변경 때 결과 창을 띄운다. 끝날 때 들고 있던 포지션은 마지막 종가로 평가해 '미청산'으로 따로 적는다.
 function btSummary(S) {
   const B = S.bt, px = S.bars.at(-1)?.close;
-  if (!B || px == null) return;
-  const st = btStats(B, px);
-  showToast(`백테스트 끝 · ${usd(B.seed)} → ${usd(st.eq)} USD (${pctStr(st.ret)}) · ${st.n}거래${st.win == null ? "" : ` 승률 ${st.win.toFixed(0)}%`} · 최대낙폭 ${(B.mdd * 100).toFixed(1)}%`, false);
+  if (!B || px == null || !S.rp) return;
+  const p = B.pos, end = S.rp.T, exitFee = p ? px * p.qty * TAKER : 0, st = btStats(B, px);
+  if (!B.trades.length && !p) { showToast("거래 없이 백테스트를 끝냈어요", false); return }
+  st.eq -= exitFee;
+  st.ret = (st.eq / B.seed - 1) * 100;
+  const col = v => `style="color:${v >= 0 ? C("--up") : C("--down")}"`;
+  const nets = B.trades.map(t => t.net), sum = nets.reduce((a, b) => a + b, 0);
+  const avg = nets.length ? sum / nets.length : null, best = nets.length ? Math.max(...nets) : null, worst = nets.length ? Math.min(...nets) : null;
+  const held = B.trades.reduce((a, t) => a + (t.t1 - t.t0), 0);
+  const row = (k, t, open) => `<tr${open ? ' class="open"' : ""}><td>${k}</td>` +
+    `<td style="color:${t.dir > 0 ? C("--up") : C("--down")}">${dirName(t.dir)} ${t.lev}x</td>` +
+    `<td>${btWhen(t.t0)}<br><span class="m">${fmt(S, t.entry)}</span></td>` +
+    `<td>${open ? "보유 중" : btWhen(t.t1)}<br><span class="m">${fmt(S, t.exit)}</span></td>` +
+    `<td>${btSpan((open ? end : t.t1) - t.t0)}</td>` +
+    `<td class="r" ${col(t.net)}>${susd(t.net)}<br><span class="m">${pctStr(t.net / t.margin * 100)}</span></td>` +
+    `<td>${open ? "미청산" : t.why}</td></tr>`;
+  const rows = B.trades.map((t, i) => row(i + 1, t, false));
+  if (p) rows.push(row("—", { dir: p.dir, lev: p.lev, entry: p.entry, exit: px, net: btUpnl(p, px) - p.fee - exitFee, margin: p.margin, t0: p.t }, true));
+  const kv = (k, v) => `<div><span class="m">${k}</span><b>${v}</b></div>`;
+  $("btres").innerHTML = `<div class="box"><div class="hd"><b>백테스트 결과</b> <span class="m">${esc(B.inst)} · ${B.lev}x</span><button data-x title="닫기 (Esc)">×</button></div>` +
+    `<div class="kv">` +
+    kv("기간", `${btSpan(end - B.t0)}<br><span class="m">${btWhen(B.t0)} → ${btWhen(end)}</span>`) +
+    kv("자산", `${usd(B.seed)} → ${usd(st.eq)} USD<br><span ${col(st.ret)}>${pctStr(st.ret)} (${susd(st.eq - B.seed)})</span>`) +
+    kv("거래", `${B.trades.length}회${p ? " + 미청산 1" : ""}<br><span class="m">${st.win == null ? "-" : `승률 ${st.win.toFixed(0)}%`}${B.trades.length ? ` · 평균 보유 ${btSpan(held / B.trades.length)}` : ""}</span>`) +
+    kv("거래당 손익", avg == null ? "-" : `<span ${col(avg)}>평균 ${susd(avg)}</span><br><span class="m">최고 ${susd(best)} · 최저 ${susd(worst)}</span>`) +
+    kv("최대낙폭", `${(B.mdd * 100).toFixed(1)}%`) +
+    kv("수수료 합계", `${usd(B.fees + exitFee)} USD`) +
+    `</div><div class="tw"><table><thead><tr><th>#</th><th>방향</th><th>진입</th><th>청산</th><th>보유</th><th class="r">손익 (증거금 대비)</th><th>사유</th></tr></thead>` +
+    `<tbody>${rows.join("")}</tbody></table></div>` +
+    `<div class="ft m">손익은 수수료를 뺀 값이에요 · 미청산은 마지막 종가로 닫았다고 보고 계산했어요 · ⌘S 로 이 창째 캡처할 수 있어요</div></div>`;
+  $("btres").classList.add("open");
 }
+
+function btResClose() { $("btres").classList.remove("open") }
+
+$("btres").addEventListener("click", e => { if (e.target.id === "btres" || e.target.closest("[data-x]")) btResClose() });
 
 function wireBtBar(S) {
   S.btEl.addEventListener("click", e => {
@@ -2106,6 +2168,7 @@ document.addEventListener("keydown", e => {
     const k = { b: 1, s: -1, x: 0 }[e.key.toLowerCase()];
     if (k !== undefined && R.bt && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); btOrder(R, k); return }
   }
+  if (e.key === "Escape" && $("btres").classList.contains("open")) { btResClose(); return }
   if (e.key !== "Escape" || typing) return;
   if ($("tctx").classList.contains("open")) { tMenuClose(); return }
   const busy = mode || selected || [indp, topp, alp].some(p => p.classList.contains("open"));
