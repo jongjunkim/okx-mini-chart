@@ -139,6 +139,23 @@ nav .dbtn:disabled{opacity:.35;cursor:default}
 .rpb .rpp{min-width:58px}
 .rpb .rpa{margin-left:auto;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap}
 .rpb [data-rp=end]{color:var(--text)}
+.btb{display:none;align-items:center;gap:4px;padding:3px 8px;background:#13161c;border-bottom:1px solid var(--line);flex:none;flex-wrap:wrap}
+.slot.replay .btb{display:flex}
+.slot.collapsed .btb{display:none}
+.btb .btt{color:var(--text);font-weight:600;margin-right:2px}
+.btb button,.btb select,.btb input{background:var(--panel);border:1px solid var(--line);color:var(--muted);padding:2px 7px;border-radius:4px;font:inherit;cursor:pointer;white-space:nowrap}
+.btb input{background:var(--bg);color:var(--text);cursor:text;padding:1px 4px;width:72px;font-variant-numeric:tabular-nums}
+.btb button:hover,.btb select:hover{color:var(--text)}
+.btb [data-bt=start]{color:var(--draw);border-color:var(--draw)}
+.btb [data-bt=buy]{color:var(--up);border-color:var(--up)}
+.btb [data-bt=sell]{color:var(--down);border-color:var(--down)}
+.btb [data-bt=buy].on{background:var(--up);color:#fff}
+.btb [data-bt=sell].on{background:var(--down);color:#fff}
+.btb [data-bt=close].on{background:var(--muted);color:var(--bg)}
+.btb .bts{margin-left:auto;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.btb .bts .m{color:var(--muted)}
+.btb .set,.btb .run{display:contents}
+.btb.going .set,.btb:not(.going) .run{display:none}
 .cut{position:absolute;top:0;bottom:0;z-index:2;pointer-events:none;display:none;background:#e0b34112;border-left:1.5px dashed var(--draw)}
 .cut b{position:absolute;top:36px;left:6px;background:var(--draw);color:var(--bg);font-size:11px;font-weight:600;padding:1px 6px;border-radius:3px;white-space:nowrap}
 .cut.flip b{left:auto;right:calc(100% + 6px)}
@@ -326,6 +343,7 @@ const BB_COLOR = "#8a94a6";
 const RSI_COLOR = "#e879f9";
 const PROFIT = "#26a69a", LOSS = "#ef5350", ENTRY = "#9aa3af";
 const TWO_CLICK = ["t", "r"];
+const BT_LEVS = [1, 2, 3, 5, 10, 20, 50, 100], BT_PCTS = [10, 25, 50, 100], BT_MMR = 0.004;
 const RP_SPEEDS = [[1000, "초당 1봉"], [333, "초당 3봉"], [100, "초당 10봉"]];
 const store = {
   get(k, d) { try { return localStorage.getItem(k) || d } catch (e) { return d } },
@@ -687,12 +705,22 @@ function makeSlot(cfg, beforeEl) {
     `<button data-rp="play" class="rpp" title="재생·멈춤 (Space)">▶ 재생</button><button data-rp="step" title="한 봉 앞으로 (Shift+→)">한 봉 ▷</button>` +
     `<select class="rps" title="재생 속도">${RP_SPEEDS.map(([v, t]) => `<option value="${v}">${t}</option>`).join("")}</select>` +
     `<span class="rpa"></span><button data-rp="end" title="실시간으로 돌아가기">끝내기</button></div>` +
+    `<div class="btb"><span class="btt">백테스트</span>` +
+    `<span class="set">시드 <input class="bsd" type="number" min="10" step="100" title="시작 자금(USD)"> USD ` +
+    `<select class="blv" title="레버리지">${BT_LEVS.map(v => `<option value="${v}">${v}x</option>`).join("")}</select>` +
+    `<button data-bt="start" title="이 봉부터 가상 매매 시작">시작</button></span>` +
+    `<span class="run"><button data-bt="buy" title="매수(롱) · 숏이면 닫기 (B)">매수</button><button data-bt="sell" title="매도(숏) · 롱이면 닫기 (S)">매도</button>` +
+    `<button data-bt="close" title="포지션 닫기 (X)">청산</button>` +
+    `<select class="bpc" title="한 번에 쓸 증거금(가용 잔고 대비)">${BT_PCTS.map(v => `<option value="${v}">${v}%</option>`).join("")}</select>` +
+    `<button data-bt="reset" title="계좌를 지우고 시드·레버리지를 다시 고르기">초기화</button></span>` +
+    `<span class="bts"></span></div>` +
     `<div class="pane"><div class="lbl"></div><div class="c"></div><div class="cut"><b></b></div><div class="empty">종목을 고르면 여기에 차트가 나와요</div></div>`;
   Object.assign(S, {
     el, symEl: el.querySelector(".sym"), pxEl: el.querySelector(".px"), pcEl: el.querySelector(".pc"), spark: el.querySelector(".spark"),
     tfEl: el.querySelector(".tf"), bellEl: el.querySelector(".bell"), colBtn: el.querySelector(".col"), suggEl: el.querySelector(".sugg"),
     pane: el.querySelector(".pane"), lbl: el.querySelector(".lbl"), box: el.querySelector(".c"),
-    cutEl: el.querySelector(".cut"), rpDate: el.querySelector(".rpd"), rpPlay: el.querySelector(".rpp"), rpSpeedEl: el.querySelector(".rps"), rpAt: el.querySelector(".rpa")
+    cutEl: el.querySelector(".cut"), rpDate: el.querySelector(".rpd"), rpPlay: el.querySelector(".rpp"), rpSpeedEl: el.querySelector(".rps"), rpAt: el.querySelector(".rpa"),
+    btEl: el.querySelector(".btb"), btSeedEl: el.querySelector(".bsd"), btLevEl: el.querySelector(".blv"), btPctEl: el.querySelector(".bpc"), btStat: el.querySelector(".bts"), btLines: []
   });
   S.tfEl.value = S.tf;
   S.chart = LightweightCharts.createChart(S.box, {
@@ -757,6 +785,7 @@ function makeSlot(cfg, beforeEl) {
     syncSubs();
   });
   wireReplayBar(S);
+  wireBtBar(S);
   S.colBtn.addEventListener("click", () => setCollapsed(S, !S.collapsed));
   el.querySelector(".cls").addEventListener("click", () => closeSlot(S));
 
@@ -850,7 +879,7 @@ function resetSeries(S) {
 async function loadSlot(S) {
   const g = ++S.gen;
   clearTimeout(S.retryT);
-  if (S.rp) { rpPause(S); S.rp = null; setRpUi(S, false) }
+  if (S.rp) { rpPause(S); btSummary(S); S.rp = null; setRpUi(S, false) }
   S.noMore = false; S.loadingOld = false;
   S.symEl.value = S.inst || "";
   S.el.classList.toggle("blank", !S.inst);
@@ -1415,6 +1444,7 @@ function setRpUi(S, on) {
   S.el.classList.toggle("replay", on);
   S.chart.applyOptions({ timeScale: { shiftVisibleRangeOnNewBar: !on } });
   if (!on) S.rpAt.textContent = "";
+  btRender(S);
 }
 
 function rpPickAt(S, x) {
@@ -1545,6 +1575,7 @@ function rpStep(S) {
   S.candle.update(b);
   S.vol.update(R.vols[i]);
   paintInd(S, false);
+  btOnBar(S, b);
   if (range) ts.setVisibleLogicalRange(i > range.to - 2 ? { from: range.from + 1, to: range.to + 1 } : range);
   rpStatus(S);
   return true;
@@ -1582,6 +1613,7 @@ function rpStatus(S) {
   setChange(S, last.close, S.bars[lo].open);
   if (!S.hover) showLbl(S);
   drawSpark(S);
+  btRender(S);
 }
 
 function wireReplayBar(S) {
@@ -1613,6 +1645,152 @@ function wireReplayBar(S) {
       if (S.rp && Number.isFinite(sec) && sec !== S.rp.T) replayFrom(S, sec);
     }, 700);
   });
+}
+
+// 리플레이 백테스트: 리플레이 칸마다 따로 굴리는 계좌. 실시간 가상 거래 계좌(acct)와 섞지 않는다.
+// 주문은 누른 순간 보이는 마지막 봉 종가가 아니라 다음 봉 시가에 체결한다(신호 t 종가, 체결 t+1 시가).
+// 격리 증거금 한 방향 포지션만 둔다. 반대쪽 버튼은 닫기로 동작하고, 청산가에 닿으면 증거금을 모두 잃는다.
+let btSeed = +store.get("okx.bt.seed", "") || 10000;
+let btLev = BT_LEVS.includes(+store.get("okx.bt.lev", "")) ? +store.get("okx.bt.lev", "") : 1;
+let btPct = BT_PCTS.includes(+store.get("okx.bt.pct", "")) ? +store.get("okx.bt.pct", "") : 25;
+
+const btLiq = p => p.entry * (1 - p.dir * (1 / p.lev - BT_MMR));
+const btUpnl = (p, px) => p.dir * (px - p.entry) * p.qty;
+const btEquity = (B, px) => B.cash + (B.pos ? B.pos.margin + btUpnl(B.pos, px) : 0);
+
+function btStart(S) {
+  const seed = +S.btSeedEl.value, lev = +S.btLevEl.value;
+  if (!S.rp || !S.bars.length) return;
+  if (!(seed >= 10)) { showToast("시드는 10 USD 이상으로 넣어 주세요", false); return }
+  btSeed = seed; btLev = lev;
+  store.set("okx.bt.seed", String(seed));
+  store.set("okx.bt.lev", String(lev));
+  S.rp.bt = { seed, lev, cash: seed, pos: null, pend: null, trades: [], marks: [], peak: seed, mdd: 0, fees: 0, from: S.bars.at(-1).time };
+  btRender(S);
+  showToast(`${usd(seed)} USD · ${lev}x 로 시작해요 · ▶ 재생하면서 매수·매도를 누르세요`, false);
+}
+
+function btOrder(S, side) {
+  const B = S.rp?.bt;
+  if (!B) return;
+  const p = B.pos;
+  if (side === 0 && !p) { showToast("닫을 포지션이 없어요", false); return }
+  if (side && (!p || p.dir === side) && B.cash < 1) { showToast("가용 잔고가 없어요 · 포지션을 닫거나 초기화하세요", false); return }
+  B.pend = B.pend === side ? null : side;
+  btRender(S);
+  if (B.pend == null) { showToast("주문을 취소했어요", false); return }
+  const what = side === 0 || (p && p.dir !== side) ? `${dirName(p.dir)} 닫기` : `${side > 0 ? "매수(롱)" : "매도(숏)"} ${btPct}%`;
+  showToast(`${what} · 다음 봉 시가에 체결돼요${S.rp.playT ? "" : " · ▶ 재생이나 한 봉 ▷을 누르세요"}`, false);
+}
+
+function btClose(S, px, t, why) {
+  const B = S.rp.bt, p = B.pos, fee = px * p.qty * TAKER, pnl = btUpnl(p, px);
+  B.cash += Math.max(0, p.margin + pnl - fee);
+  B.fees += fee;
+  const net = pnl - fee - p.fee;
+  B.trades.push({ dir: p.dir, entry: p.entry, exit: px, net, why });
+  B.marks.push({ t, dir: -p.dir, text: `${why} ${susd(net)}` });
+  B.pos = null;
+}
+
+function btFill(S, side, px, t) {
+  const B = S.rp.bt, p = B.pos;
+  if (side === 0 || (p && p.dir !== side)) { if (p) btClose(S, px, t, "닫기"); return }
+  const margin = B.cash * btPct / 100 / (1 + B.lev * TAKER);
+  if (margin < 1) { showToast("가용 잔고가 모자라 주문을 건너뛰었어요", false); return }
+  const qty = margin * B.lev / px, fee = px * qty * TAKER;
+  B.cash -= margin + fee;
+  B.fees += fee;
+  if (p) {
+    p.entry = (p.entry * p.qty + px * qty) / (p.qty + qty);
+    p.qty += qty; p.margin += margin; p.fee += fee;
+  } else B.pos = { dir: side, entry: px, qty, margin, fee, lev: B.lev };
+  B.marks.push({ t, dir: side, text: `${p ? "추가" : side > 0 ? "롱" : "숏"} ${B.lev}x` });
+}
+
+function btLiquidate(S, px, t) {
+  const B = S.rp.bt, p = B.pos;
+  B.trades.push({ dir: p.dir, entry: p.entry, exit: px, net: -p.margin - p.fee, why: "강제청산" });
+  B.marks.push({ t, dir: -p.dir, text: `강제청산 ${susd(-p.margin - p.fee)}` });
+  B.pos = null;
+  showToast(`강제 청산 · ${dirName(p.dir)} ${p.lev}x 증거금 ${usd(p.margin)} USD를 잃었어요`, false);
+}
+
+// 새 봉이 붙을 때마다: 시가에 이미 청산가를 넘었으면 청산 → 대기 주문을 시가에 체결 → 봉 안에서 청산가에 닿았는지 확인.
+// 진입한 봉에서도 청산을 확인한다(같은 봉 안의 순서를 모르니 불리한 쪽으로 본다).
+function btOnBar(S, b) {
+  const B = S.rp?.bt;
+  if (!B) return;
+  const n = B.marks.length, hit = (p, x) => p.dir > 0 ? x <= btLiq(p) : x >= btLiq(p);
+  if (B.pos && hit(B.pos, b.open)) btLiquidate(S, b.open, b.time);
+  if (B.pend != null) { btFill(S, B.pend, b.open, b.time); B.pend = null }
+  if (B.pos && hit(B.pos, B.pos.dir > 0 ? b.low : b.high)) btLiquidate(S, btLiq(B.pos), b.time);
+  const eq = btEquity(B, b.close);
+  B.peak = Math.max(B.peak, eq);
+  B.mdd = Math.min(B.mdd, eq / B.peak - 1);
+  if (B.marks.length !== n) updateMarkers(S);
+}
+
+function btStats(B, px) {
+  const eq = btEquity(B, px), wins = B.trades.filter(t => t.net > 0).length;
+  return { eq, ret: (eq / B.seed - 1) * 100, n: B.trades.length, win: B.trades.length ? wins / B.trades.length * 100 : null };
+}
+
+function btRender(S) {
+  const R = S.rp, B = R?.bt, px = S.bars.at(-1)?.close;
+  S.btEl.classList.toggle("going", !!B);
+  for (const l of S.btLines) S.candle.removePriceLine(l);
+  S.btLines = [];
+  if (!B) {
+    if (document.activeElement !== S.btSeedEl) S.btSeedEl.value = String(btSeed);
+    S.btLevEl.value = String(btLev);
+    S.btStat.textContent = R ? "시드와 레버리지를 고르고 시작을 누르세요" : "";
+    S.btStat.title = "";
+    return;
+  }
+  S.btPctEl.value = String(btPct);
+  for (const [k, v] of [["buy", 1], ["sell", -1], ["close", 0]]) S.btEl.querySelector(`[data-bt=${k}]`).classList.toggle("on", B.pend === v);
+  if (px == null) return;
+  const st = btStats(B, px), p = B.pos, col = v => `style="color:${v >= 0 ? C("--up") : C("--down")}"`;
+  let html = `자산 <b>$${usd(st.eq)}</b> <span ${col(st.ret)}>${pctStr(st.ret)}</span>`;
+  if (p) {
+    const u = btUpnl(p, px);
+    html += ` <span class="m">·</span> ${dirName(p.dir)} ${p.lev}x <span ${col(u)}>${susd(u)}</span>`;
+    S.btLines.push(S.candle.createPriceLine({ price: p.entry, color: C("--draw"), lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: `${dirName(p.dir)} 진입` }));
+    S.btLines.push(S.candle.createPriceLine({ price: btLiq(p), color: C("--muted"), lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "청산가" }));
+  }
+  if (B.pend != null) html += ` <span class="m">· 대기</span>`;
+  html += ` <span class="m">· ${st.n}거래${st.win == null ? "" : ` 승률 ${st.win.toFixed(0)}%`}</span>`;
+  S.btStat.innerHTML = html;
+  S.btStat.title = `시드 ${usd(B.seed)} · 가용 ${usd(B.cash)} · 수수료 누계 ${usd(B.fees)} · 최대낙폭 ${(B.mdd * 100).toFixed(1)}%` +
+    (p ? `\n진입 ${fmt(S, p.entry)} · 청산가 ${fmt(S, btLiq(p))} · 증거금 ${usd(p.margin)}` : "");
+}
+
+function btSummary(S) {
+  const B = S.rp?.bt, px = S.bars.at(-1)?.close;
+  if (!B || px == null) return;
+  const st = btStats(B, px);
+  showToast(`백테스트 끝 · ${usd(B.seed)} → ${usd(st.eq)} USD (${pctStr(st.ret)}) · ${st.n}거래${st.win == null ? "" : ` 승률 ${st.win.toFixed(0)}%`} · 최대낙폭 ${(B.mdd * 100).toFixed(1)}%`, false);
+}
+
+function wireBtBar(S) {
+  S.btEl.addEventListener("click", e => {
+    const b = e.target.closest("button[data-bt]");
+    if (!b) return;
+    b.blur();
+    const a = b.dataset.bt;
+    if (a === "start") btStart(S);
+    else if (a === "buy") btOrder(S, 1);
+    else if (a === "sell") btOrder(S, -1);
+    else if (a === "close") btOrder(S, 0);
+    else if (a === "reset" && S.rp) { btSummary(S); S.rp.bt = null; updateMarkers(S); btRender(S) }
+  });
+  S.btPctEl.addEventListener("change", () => {
+    btPct = +S.btPctEl.value;
+    store.set("okx.bt.pct", String(btPct));
+    S.btPctEl.blur();
+  });
+  S.btSeedEl.addEventListener("keydown", e => { if (e.key === "Enter") btStart(S) });
 }
 
 let universe = [], uniP = null, uniAt = 0;
@@ -1867,6 +2045,8 @@ document.addEventListener("keydown", e => {
   if (R && !typing) {
     if (e.key === "ArrowRight" && e.shiftKey) { e.preventDefault(); rpPause(R); rpStep(R); return }
     if (e.key === " ") { e.preventDefault(); document.activeElement?.blur?.(); rpToggle(R); return }
+    const k = { b: 1, s: -1, x: 0 }[e.key.toLowerCase()];
+    if (k !== undefined && R.rp.bt && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); btOrder(R, k); return }
   }
   if (e.key !== "Escape" || typing) return;
   if ($("tctx").classList.contains("open")) { tMenuClose(); return }
@@ -2053,9 +2233,13 @@ function updateMarkers(S) {
   if (!S.inst || !S.bars.length) { S.candle.setMarkers([]); return }
   const times = new Set(alertLog.filter(e => e.inst === S.inst && e.tf === S.tf).map(e => Math.floor(e.ts / 1000) + TZ)
     .filter(t => idxOfTime(S.bars, t) >= 0));
-  S.candle.setMarkers([...times].sort((a, b) => a - b).map(t => ({
+  const ms = [...times].map(t => ({
     time: t, position: "belowBar", color: C("--draw"), shape: "arrowUp", text: "정배열 " + hm((t - TZ + SEC[S.tf]) * 1000)
-  })));
+  }));
+  for (const m of S.rp?.bt?.marks || []) if (idxOfTime(S.bars, m.t) >= 0) ms.push({
+    time: m.t, position: m.dir > 0 ? "belowBar" : "aboveBar", color: m.dir > 0 ? C("--up") : C("--down"), shape: m.dir > 0 ? "arrowUp" : "arrowDown", text: m.text
+  });
+  S.candle.setMarkers(ms.sort((a, b) => a.time - b.time));
 }
 
 function updateAlertBadge() {
