@@ -449,6 +449,13 @@ function rsi(cl, n) {
   return out;
 }
 
+// t(봉 시작 시각 + TZ)를 담고 있는 봉의 위치. 간격이 달라도 찾을 수 있다.
+function barAt(S, t) {
+  let lo = 0, hi = S.bars.length - 1, i = -1;
+  while (lo <= hi) { const m = (lo + hi) >> 1; if (S.bars[m].time <= t) { i = m; lo = m + 1 } else hi = m - 1 }
+  return i >= 0 && t < S.bars[i].time + SEC[S.tf] ? i : -1;
+}
+
 function idxOfTime(bars, t) {
   let lo = 0, hi = bars.length - 1;
   while (lo <= hi) {
@@ -522,7 +529,7 @@ function tag(ctx, text, x, y, bg, width) {
 // 리플레이 백테스트 포지션 라벨(TradingView 포지션 선처럼): 진입가 선 오른쪽에 [방향·배율·수량][미실현 손익]을 붙인다.
 // 선은 진입가 priceLine 이 그리고, 여기서는 라벨만 그린다. 선이 화면 밖이면 위·아래 가장자리에 붙여 둔다.
 function drawBtPos(ctx, S, W, H) {
-  const p = S.rp?.bt?.pos, px = S.bars.at(-1)?.close;
+  const p = S.bt?.pos, px = S.bars.at(-1)?.close;
   if (!p || px == null) return;
   const y0 = S.candle.priceToCoordinate(p.entry);
   if (y0 == null) return;
@@ -720,7 +727,7 @@ function makeSlot(cfg, beforeEl) {
   const S = {
     id: nextId++, inst: cfg.inst || null, tf: BARS.includes(cfg.tf) ? cfg.tf : "15m", collapsed: !!cfg.collapsed, w: cfg.w || NEW_PANE_H,
     bars: [], vols: [], ind: null, hlines: [], last: null, hover: false, loadingOld: false, noMore: false, gen: 0, prec: 2, ready: false,
-    sugg: [], selIdx: 0, retryT: null, rp: null
+    sugg: [], selIdx: 0, retryT: null, rp: null, bt: null
   };
   const el = document.createElement("section");
   el.className = "slot";
@@ -808,10 +815,11 @@ function makeSlot(cfg, beforeEl) {
 
   wireSymbolInput(S);
   S.tfEl.addEventListener("change", () => {
+    const prevTf = S.tf;
     S.tf = S.tfEl.value;
     S.chart.applyOptions({ timeScale: { timeVisible: S.tf !== "1d" } });
     saveSlots();
-    if (S.rp) replayFrom(S, S.rp.T); else loadSlot(S);
+    if (S.rp) replayFrom(S, S.rp.T, { tf: prevTf, rp: S.rp, bars: S.bars, vols: S.vols }); else loadSlot(S);
     syncSubs();
   });
   wireReplayBar(S);
@@ -909,7 +917,7 @@ function resetSeries(S) {
 async function loadSlot(S) {
   const g = ++S.gen;
   clearTimeout(S.retryT);
-  if (S.rp) { rpPause(S); btSummary(S); S.rp = null; setRpUi(S, false) }
+  if (S.rp) { rpPause(S); btSummary(S); S.bt = null; S.rp = null; setRpUi(S, false) }
   S.noMore = false; S.loadingOld = false;
   S.symEl.value = S.inst || "";
   S.el.classList.toggle("blank", !S.inst);
@@ -1521,7 +1529,7 @@ function rpShow(S, keep) {
 
 function rpStartAt(S, x) {
   const k = rpPickAt(S, x);
-  if (!k) return;
+  if (!k || !btCanJump(S, closeOf(S, k.base[k.i]))) return;
   rpPause(S);
   const R = S.rp = { T: closeOf(S, k.base[k.i]), bars: k.base.slice(0, k.n), vols: k.vb.slice(0, k.n), fwdDone: false, fwdLoading: false, playT: null };
   S.bars = R.bars.slice(0, k.i + 1);
@@ -1529,7 +1537,7 @@ function rpStartAt(S, x) {
   rpShow(S, true);
 }
 
-async function replayFrom(S, T) {
+async function replayFrom(S, T, prev) {
   if (!S.inst) return;
   T = Math.floor(Math.min(T, nowSec()));
   rpPause(S);
@@ -1563,6 +1571,16 @@ async function replayFrom(S, T) {
     rpFetchForward(S);
   } catch (e) {
     if (g !== S.gen) return;
+    if (prev && S.bt) {
+      // 간격 바꾸기에 실패해도 백테스트는 끊지 않는다: 이전 간격 화면으로 되돌린다
+      Object.assign(S, { tf: prev.tf, rp: prev.rp, bars: prev.bars, vols: prev.vols, ready: true });
+      S.tfEl.value = prev.tf;
+      S.chart.applyOptions({ timeScale: { timeVisible: prev.tf !== "1d" } });
+      saveSlots();
+      rpShow(S);
+      showToast(`간격을 바꾸지 못해 ${prev.tf}로 돌아왔어요 · ${e.message}`, false);
+      return;
+    }
     showToast(`리플레이 봉을 받지 못했어요 · ${e.message}`, false);
     loadSlot(S);
   }
@@ -1672,7 +1690,7 @@ function wireReplayBar(S) {
     clearTimeout(t);
     t = setTimeout(() => {
       const sec = Math.floor(new Date(S.rpDate.value).getTime() / 1000);
-      if (S.rp && Number.isFinite(sec) && sec !== S.rp.T) replayFrom(S, sec);
+      if (S.rp && Number.isFinite(sec) && sec !== S.rp.T) { if (btCanJump(S, sec)) replayFrom(S, sec); else rpStatus(S) }
     }, 700);
   });
 }
@@ -1688,6 +1706,14 @@ const btLiq = p => p.entry * (1 - p.dir * (1 / p.lev - BT_MMR));
 const btUpnl = (p, px) => p.dir * (px - p.entry) * p.qty;
 const btEquity = (B, px) => B.cash + (B.pos ? B.pos.margin + btUpnl(B.pos, px) : 0);
 
+// 백테스트 중 시각 옮기기: 뒤로 가면 이미 본 미래로 다시 매매하게 되고, 포지션을 든 채 건너뛰면 그 사이 강제청산을 못 본다.
+function btCanJump(S, T) {
+  if (!S.bt || !S.rp) return true;
+  if (T < S.rp.T) { showToast("백테스트 중에는 뒤로 갈 수 없어요 · 초기화하거나 끝내기를 누르세요", false); return false }
+  if (S.bt.pos || S.bt.pend) { showToast("포지션이나 대기 주문이 있으면 건너뛸 수 없어요 · 정리하고 옮기세요", false); return false }
+  return true;
+}
+
 function btStart(S) {
   const seed = +S.btSeedEl.value, lev = +S.btLevEl.value;
   if (!S.rp || !S.bars.length) return;
@@ -1695,18 +1721,18 @@ function btStart(S) {
   btSeed = seed; btLev = lev;
   store.set("okx.bt.seed", String(seed));
   store.set("okx.bt.lev", String(lev));
-  S.rp.bt = { seed, lev, cash: seed, pos: null, pend: null, trades: [], marks: [], peak: seed, mdd: 0, fees: 0, from: S.bars.at(-1).time };
+  S.bt = { seed, lev, cash: seed, pos: null, pend: null, trades: [], marks: [], peak: seed, mdd: 0, fees: 0 };
   btRender(S);
   showToast(`${usd(seed)} USD · ${lev}x 로 시작해요 · ▶ 재생하면서 매수·매도를 누르세요`, false);
 }
 
 function btOrder(S, side) {
-  const B = S.rp?.bt;
-  if (!B) return;
+  const B = S.bt;
+  if (!B || !S.rp) return;
   const p = B.pos;
   if (side === 0 && !p) { showToast("닫을 포지션이 없어요", false); return }
   if (side && (!p || p.dir === side) && B.cash < 1) { showToast("가용 잔고가 없어요 · 포지션을 닫거나 초기화하세요", false); return }
-  B.pend = B.pend === side ? null : side;
+  B.pend = B.pend?.side === side ? null : { side, T: S.rp.T };
   btRender(S);
   if (B.pend == null) { showToast("주문을 취소했어요", false); return }
   const what = side === 0 || (p && p.dir !== side) ? `${dirName(p.dir)} 닫기` : `${side > 0 ? "매수(롱)" : "매도(숏)"} ${btPct}%`;
@@ -1714,7 +1740,7 @@ function btOrder(S, side) {
 }
 
 function btClose(S, px, t, why) {
-  const B = S.rp.bt, p = B.pos, fee = px * p.qty * TAKER, pnl = btUpnl(p, px);
+  const B = S.bt, p = B.pos, fee = px * p.qty * TAKER, pnl = btUpnl(p, px);
   B.cash += Math.max(0, p.margin + pnl - fee);
   B.fees += fee;
   const net = pnl - fee - p.fee;
@@ -1724,7 +1750,7 @@ function btClose(S, px, t, why) {
 }
 
 function btFill(S, side, px, t) {
-  const B = S.rp.bt, p = B.pos;
+  const B = S.bt, p = B.pos;
   if (side === 0 || (p && p.dir !== side)) { if (p) btClose(S, px, t, "닫기"); return }
   const margin = B.cash * btPct / 100 / (1 + B.lev * TAKER);
   if (margin < 1) { showToast("가용 잔고가 모자라 주문을 건너뛰었어요", false); return }
@@ -1739,7 +1765,7 @@ function btFill(S, side, px, t) {
 }
 
 function btLiquidate(S, px, t) {
-  const B = S.rp.bt, p = B.pos;
+  const B = S.bt, p = B.pos;
   B.trades.push({ dir: p.dir, entry: p.entry, exit: px, net: -p.margin - p.fee, why: "강제청산" });
   B.marks.push({ t, dir: -p.dir, text: `강제청산 ${susd(-p.margin - p.fee)}` });
   B.pos = null;
@@ -1749,11 +1775,12 @@ function btLiquidate(S, px, t) {
 // 새 봉이 붙을 때마다: 시가에 이미 청산가를 넘었으면 청산 → 대기 주문을 시가에 체결 → 봉 안에서 청산가에 닿았는지 확인.
 // 진입한 봉에서도 청산을 확인한다(같은 봉 안의 순서를 모르니 불리한 쪽으로 본다).
 function btOnBar(S, b) {
-  const B = S.rp?.bt;
+  const B = S.bt;
   if (!B) return;
   const n = B.marks.length, hit = (p, x) => p.dir > 0 ? x <= btLiq(p) : x >= btLiq(p);
   if (B.pos && hit(B.pos, b.open)) btLiquidate(S, b.open, b.time);
-  if (B.pend != null) { btFill(S, B.pend, b.open, b.time); B.pend = null }
+  // 간격을 굵게 바꾸면 다음 봉 시가가 주문 시각보다 앞설 수 있다. 그 가격엔 살 수 없었으니 그 봉 종가에 체결한다.
+  if (B.pend) { btFill(S, B.pend.side, closeOf(S, b) - SEC[S.tf] >= B.pend.T ? b.open : b.close, b.time); B.pend = null }
   if (B.pos && hit(B.pos, B.pos.dir > 0 ? b.low : b.high)) btLiquidate(S, btLiq(B.pos), b.time);
   const eq = btEquity(B, b.close);
   B.peak = Math.max(B.peak, eq);
@@ -1767,7 +1794,7 @@ function btStats(B, px) {
 }
 
 function btRender(S) {
-  const R = S.rp, B = R?.bt, px = S.bars.at(-1)?.close;
+  const R = S.rp, B = R ? S.bt : null, px = S.bars.at(-1)?.close;
   S.btEl.classList.toggle("going", !!B);
   for (const l of S.btLines) S.candle.removePriceLine(l);
   S.btLines = [];
@@ -1779,7 +1806,7 @@ function btRender(S) {
     return;
   }
   S.btPctEl.value = String(btPct);
-  for (const [k, v] of [["buy", 1], ["sell", -1], ["close", 0]]) S.btEl.querySelector(`[data-bt=${k}]`).classList.toggle("on", B.pend === v);
+  for (const [k, v] of [["buy", 1], ["sell", -1], ["close", 0]]) S.btEl.querySelector(`[data-bt=${k}]`).classList.toggle("on", B.pend?.side === v);
   if (px == null) return;
   const st = btStats(B, px), p = B.pos, col = v => `style="color:${v >= 0 ? C("--up") : C("--down")}"`;
   let html = `자산 <b>$${usd(st.eq)}</b> <span ${col(st.ret)}>${pctStr(st.ret)}</span>`;
@@ -1789,7 +1816,7 @@ function btRender(S) {
     S.btLines.push(S.candle.createPriceLine({ price: p.entry, color: p.dir > 0 ? C("--up") : C("--down"), lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: "" }));
     S.btLines.push(S.candle.createPriceLine({ price: btLiq(p), color: C("--muted"), lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "강제청산가" }));
   }
-  if (B.pend != null) html += ` <span class="m">· 대기</span>`;
+  if (B.pend) html += ` <span class="m">· 대기</span>`;
   html += ` <span class="m">· ${st.n}거래${st.win == null ? "" : ` 승률 ${st.win.toFixed(0)}%`}</span>`;
   S.btStat.innerHTML = html;
   S.layer.requestUpdate?.();
@@ -1798,7 +1825,7 @@ function btRender(S) {
 }
 
 function btSummary(S) {
-  const B = S.rp?.bt, px = S.bars.at(-1)?.close;
+  const B = S.bt, px = S.bars.at(-1)?.close;
   if (!B || px == null) return;
   const st = btStats(B, px);
   showToast(`백테스트 끝 · ${usd(B.seed)} → ${usd(st.eq)} USD (${pctStr(st.ret)}) · ${st.n}거래${st.win == null ? "" : ` 승률 ${st.win.toFixed(0)}%`} · 최대낙폭 ${(B.mdd * 100).toFixed(1)}%`, false);
@@ -1814,7 +1841,7 @@ function wireBtBar(S) {
     else if (a === "buy") btOrder(S, 1);
     else if (a === "sell") btOrder(S, -1);
     else if (a === "close") btOrder(S, 0);
-    else if (a === "reset" && S.rp) { btSummary(S); S.rp.bt = null; updateMarkers(S); btRender(S) }
+    else if (a === "reset" && S.rp) { btSummary(S); S.bt = null; updateMarkers(S); btRender(S) }
   });
   S.btPctEl.addEventListener("change", () => {
     btPct = +S.btPctEl.value;
@@ -2077,7 +2104,7 @@ document.addEventListener("keydown", e => {
     if (e.key === "ArrowRight" && e.shiftKey) { e.preventDefault(); rpPause(R); rpStep(R); return }
     if (e.key === " ") { e.preventDefault(); document.activeElement?.blur?.(); rpToggle(R); return }
     const k = { b: 1, s: -1, x: 0 }[e.key.toLowerCase()];
-    if (k !== undefined && R.rp.bt && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); btOrder(R, k); return }
+    if (k !== undefined && R.bt && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); btOrder(R, k); return }
   }
   if (e.key !== "Escape" || typing) return;
   if ($("tctx").classList.contains("open")) { tMenuClose(); return }
@@ -2267,9 +2294,12 @@ function updateMarkers(S) {
   const ms = [...times].map(t => ({
     time: t, position: "belowBar", color: C("--draw"), shape: "arrowUp", text: "정배열 " + hm((t - TZ + SEC[S.tf]) * 1000)
   }));
-  for (const m of S.rp?.bt?.marks || []) if (idxOfTime(S.bars, m.t) >= 0) ms.push({
-    time: m.t, position: m.dir > 0 ? "belowBar" : "aboveBar", color: m.dir > 0 ? C("--up") : C("--down"), shape: m.dir > 0 ? "arrowUp" : "arrowDown", text: m.text
-  });
+  for (const m of S.rp ? S.bt?.marks || [] : []) {
+    const i = barAt(S, m.t);
+    if (i >= 0) ms.push({
+    time: S.bars[i].time, position: m.dir > 0 ? "belowBar" : "aboveBar", color: m.dir > 0 ? C("--up") : C("--down"), shape: m.dir > 0 ? "arrowUp" : "arrowDown", text: m.text
+    });
+  }
   S.candle.setMarkers(ms.sort((a, b) => a.time - b.time));
 }
 
