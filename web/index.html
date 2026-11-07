@@ -519,6 +519,33 @@ function tag(ctx, text, x, y, bg, width) {
   ctx.fillText(text, lx + 5, y + 0.5);
 }
 
+// 리플레이 백테스트 포지션 라벨(TradingView 포지션 선처럼): 진입가 선 오른쪽에 [방향·배율·수량][미실현 손익]을 붙인다.
+// 선은 진입가 priceLine 이 그리고, 여기서는 라벨만 그린다. 선이 화면 밖이면 위·아래 가장자리에 붙여 둔다.
+function drawBtPos(ctx, S, W, H) {
+  const p = S.rp?.bt?.pos, px = S.bars.at(-1)?.close;
+  if (!p || px == null) return;
+  const y0 = S.candle.priceToCoordinate(p.entry);
+  if (y0 == null) return;
+  const col = p.dir > 0 ? C("--up") : C("--down"), u = btUpnl(p, px), h = 18;
+  const y = Math.round(Math.max(h / 2 + 1, Math.min(H - h / 2 - 1, y0)));
+  const qty = p.qty >= 100 ? p.qty.toFixed(0) : p.qty >= 1 ? p.qty.toFixed(3) : p.qty.toPrecision(4);
+  const a = `${dirName(p.dir)} ${p.lev}x  ${qty} ${S.inst.split("-")[0]}`, b = `${susd(u)} USD  ${pctStr(u / p.margin * 100)}`;
+  ctx.font = "600 11px -apple-system, BlinkMacSystemFont, sans-serif";
+  const wa = ctx.measureText(a).width + 12, wb = ctx.measureText(b).width + 12, x = Math.max(2, W - wa - wb - 10);
+  ctx.fillStyle = col;
+  ctx.fillRect(x, y - h / 2, wa, h);
+  ctx.fillStyle = C("--panel");
+  ctx.fillRect(x + wa, y - h / 2, wb, h);
+  ctx.strokeStyle = col;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 0.5, y - h / 2 + 0.5, wa + wb - 1, h - 1);
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#fff";
+  ctx.fillText(a, x + 6, y + 0.5);
+  ctx.fillStyle = u >= 0 ? C("--up") : C("--down");
+  ctx.fillText(b, x + wa + 6, y + 0.5);
+}
+
 function handle(ctx, x, y, color) {
   ctx.fillStyle = C("--bg");
   ctx.strokeStyle = color;
@@ -608,6 +635,9 @@ class DrawLayer {
         else drawPosition(ctx, S, d, sel, W);
         ctx.restore();
       }
+      ctx.save();
+      drawBtPos(ctx, S, W, mediaSize.height);
+      ctx.restore();
     });
   }
 }
@@ -710,7 +740,7 @@ function makeSlot(cfg, beforeEl) {
     `<select class="blv" title="레버리지">${BT_LEVS.map(v => `<option value="${v}">${v}x</option>`).join("")}</select>` +
     `<button data-bt="start" title="이 봉부터 가상 매매 시작">시작</button></span>` +
     `<span class="run"><button data-bt="buy" title="매수(롱) · 숏이면 닫기 (B)">매수</button><button data-bt="sell" title="매도(숏) · 롱이면 닫기 (S)">매도</button>` +
-    `<button data-bt="close" title="포지션 닫기 (X)">청산</button>` +
+    `<button data-bt="close" title="포지션 정리: 방향과 상관없이 전량 닫기 (X)">정리</button>` +
     `<select class="bpc" title="한 번에 쓸 증거금(가용 잔고 대비)">${BT_PCTS.map(v => `<option value="${v}">${v}%</option>`).join("")}</select>` +
     `<button data-bt="reset" title="계좌를 지우고 시드·레버리지를 다시 고르기">초기화</button></span>` +
     `<span class="bts"></span></div>` +
@@ -1756,14 +1786,15 @@ function btRender(S) {
   if (p) {
     const u = btUpnl(p, px);
     html += ` <span class="m">·</span> ${dirName(p.dir)} ${p.lev}x <span ${col(u)}>${susd(u)}</span>`;
-    S.btLines.push(S.candle.createPriceLine({ price: p.entry, color: C("--draw"), lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: `${dirName(p.dir)} 진입` }));
-    S.btLines.push(S.candle.createPriceLine({ price: btLiq(p), color: C("--muted"), lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "청산가" }));
+    S.btLines.push(S.candle.createPriceLine({ price: p.entry, color: p.dir > 0 ? C("--up") : C("--down"), lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: "" }));
+    S.btLines.push(S.candle.createPriceLine({ price: btLiq(p), color: C("--muted"), lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "강제청산가" }));
   }
   if (B.pend != null) html += ` <span class="m">· 대기</span>`;
   html += ` <span class="m">· ${st.n}거래${st.win == null ? "" : ` 승률 ${st.win.toFixed(0)}%`}</span>`;
   S.btStat.innerHTML = html;
+  S.layer.requestUpdate?.();
   S.btStat.title = `시드 ${usd(B.seed)} · 가용 ${usd(B.cash)} · 수수료 누계 ${usd(B.fees)} · 최대낙폭 ${(B.mdd * 100).toFixed(1)}%` +
-    (p ? `\n진입 ${fmt(S, p.entry)} · 청산가 ${fmt(S, btLiq(p))} · 증거금 ${usd(p.margin)}` : "");
+    (p ? `\n진입 ${fmt(S, p.entry)} · 강제청산가 ${fmt(S, btLiq(p))} · 증거금 ${usd(p.margin)}` : "");
 }
 
 function btSummary(S) {
