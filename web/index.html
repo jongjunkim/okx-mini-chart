@@ -141,6 +141,10 @@ nav .dbtn:disabled{opacity:.35;cursor:default}
 #alp .rec .id{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #alp .rec .p{width:64px;text-align:right;flex:none}
 #alp .warn{color:var(--draw);font-size:11px}
+#alp .wr.pa{cursor:pointer;font-variant-numeric:tabular-nums}
+#alp .wr.pa:hover{background:#1d232d}
+#alp .wr.pa .k{width:52px;text-align:right}
+#tctx .nt{padding:4px 10px;color:var(--muted);font-size:11px;white-space:normal;max-width:236px}
 #alp .test{color:var(--text)}
 .bell{display:none;align-items:center;color:var(--draw);flex:none;margin-left:auto}
 .slot.watched .bell{display:flex}
@@ -290,6 +294,7 @@ body.trading #dock{display:flex}
 #tctx .qgo .b{background:var(--up)}
 #tctx .qgo .s{background:var(--down)}
 #qAll{padding:4px 0}
+#aGo{background:#b48cf2!important;color:#0f1115!important}
 #qX{background:var(--panel)!important;border:1px solid var(--line)!important;color:var(--muted)!important;font-weight:400!important}
 </style>
 </head>
@@ -2226,6 +2231,10 @@ let alertLog = (() => {
   try { const v = JSON.parse(store.get("okx.alert.log", "")); if (Array.isArray(v)) return v } catch (e) {}
   return [];
 })();
+let palerts = (() => {
+  try { const v = JSON.parse(store.get("okx.palerts", "")); if (Array.isArray(v)) return v } catch (e) {}
+  return [];
+})();
 let alertUnseen = 0, alSugg = [], alSel = 0, watchChain = Promise.resolve();
 const watchers = new Map();
 const alp = $("alp");
@@ -2236,6 +2245,11 @@ const hm = ms => new Date(ms).toLocaleTimeString("ko-KR", { hour: "2-digit", min
 const watchBar = (r, inst) => ({ ts: +r[0], h: +r[2], l: +r[3], c: +r[4], v: +r[volIdx(inst)] });
 const alertTfs = () => [...alertCfg.tfs, ...(alertCfg.brk ? ["1d"] : [])];
 const pxStr = v => v.toLocaleString("en-US", { maximumSignificantDigits: 6 });
+const ALERT_C = "#b48cf2";
+const savePalerts = () => store.set("okx.palerts", JSON.stringify(palerts));
+const apf = (a, v = a.px) => v.toLocaleString("en-US", { minimumFractionDigits: a.prec, maximumFractionDigits: a.prec });
+const curPx = inst => lastOf(inst) ?? slotsOf(inst).find(S => S.bars.length && !S.rp)?.bars.at(-1).close;
+const pWord = dir => dir > 0 ? "상향 돌파" : "하향 이탈";
 
 function whenStr(ms) {
   const d = new Date(ms).toDateString(), now = Date.now();
@@ -2280,9 +2294,9 @@ function refreshWatchers() {
   }
   const insts = alertInsts();
   for (const S of slots) {
-    const on = !!S.inst && insts.includes(S.inst);
-    S.el.classList.toggle("watched", on);
-    S.bellEl.title = on ? [alertCfg.tfs.length ? `정배열 알림 감시 중 (${alertCfg.tfs.join("·")})` : "", alertCfg.brk ? `일봉 ${ind.dc.n}일 돌파 알림 감시 중` : ""].filter(Boolean).join("\n") : "";
+    const on = !!S.inst && insts.includes(S.inst), np = S.inst ? palerts.filter(a => a.inst === S.inst).length : 0;
+    S.el.classList.toggle("watched", on || np > 0);
+    S.bellEl.title = [...(on ? [alertCfg.tfs.length ? `정배열 알림 감시 중 (${alertCfg.tfs.join("·")})` : "", alertCfg.brk ? `일봉 ${ind.dc.n}일 돌파 알림 감시 중` : ""] : []), np ? `가격 알림 ${np}개` : ""].filter(Boolean).join("\n");
   }
 }
 
@@ -2406,6 +2420,75 @@ function fireAlert(W, ts, px, kind, title, body) {
   slotsOf(W.inst).forEach(updateMarkers);
 }
 
+function pChanged() {
+  savePalerts();
+  syncTradeSubs();
+  refreshWatchers();
+  tRepaint();
+  if (alp.classList.contains("open")) renderAlertPanel();
+}
+
+function pAdd(S, price) {
+  const cur = curPx(S.inst), px = +price.toFixed(S.prec);
+  if (!cur) return tSay("시세를 받는 중이에요");
+  if (!(px > 0) || px === cur) return tSay("현재가와 다른 가격에 걸어 주세요");
+  const a = { id: palerts.reduce((m, x) => Math.max(m, x.id), 0) + 1, inst: S.inst, px, prec: S.prec, dir: px > cur ? 1 : -1, at: Date.now() };
+  palerts.push(a);
+  pChanged();
+  if (alertCfg.banner) post({ notifyAuth: true });
+  tSay(`가격 알림 · ${a.inst} ${apf(a)} ${pWord(a.dir)} 때 한 번 울려요`);
+  return true;
+}
+
+function pRemove(id) {
+  const a = palerts.find(x => x.id === id);
+  if (!a) return;
+  palerts = palerts.filter(x => x !== a);
+  pChanged();
+  tSay(`${a.inst} ${apf(a)} 가격 알림을 지웠어요`);
+}
+
+function pMove(id, price) {
+  const a = palerts.find(x => x.id === id), cur = a && curPx(a.inst);
+  if (!a || !(price > 0)) return;
+  if (price === cur) { tRepaint(); tSay("현재가와 다른 가격에 걸어 주세요"); return }
+  a.px = price;
+  if (cur) a.dir = price > cur ? 1 : -1;
+  pChanged();
+  tSay(`가격 알림 이동 · ${apf(a)} ${pWord(a.dir)}`);
+}
+
+function pEval(inst) {
+  const last = lastOf(inst);
+  if (!last) return;
+  const hit = palerts.filter(a => a.inst === inst && (a.dir > 0 ? last >= a.px : last <= a.px));
+  if (!hit.length) return;
+  palerts = palerts.filter(a => !hit.includes(a));
+  for (const a of hit) firePrice(a, last);
+  pChanged();
+}
+
+function firePrice(a, last) {
+  const now = Date.now(), title = `${a.inst} · ${apf(a)} ${pWord(a.dir)}`;
+  alertLog.unshift({ inst: a.inst, tf: "", ts: now, at: now, px: apf(a, last), kind: a.dir > 0 ? "pxu" : "pxd" });
+  alertLog.length = Math.min(alertLog.length, 30);
+  store.set("okx.alert.log", JSON.stringify(alertLog));
+  post({ notify: {
+    title, body: `현재가 ${apf(a, last)}\n${whenStr(a.at)}에 건 가격 알림`, inst: a.inst, tf: "", banner: !!alertCfg.banner, sound: alertCfg.sound ? alertCfg.soundName : ""
+  } });
+  showToast(`${title} · 현재가 ${apf(a, last)}`, false);
+  if (!alp.classList.contains("open")) { alertUnseen++; updateAlertBadge() }
+}
+
+function aLines(inst) {
+  if (!inst) return [];
+  const cur = curPx(inst);
+  return palerts.filter(a => a.inst === inst).map(a => {
+    const k = "a" + a.id, v = tdrag && tdrag.key === k ? tdrag.price : a.px, up = cur ? v > cur : a.dir > 0;
+    return { key: k, price: v, color: ALERT_C, dash: [4, 3], label: `알림 ${up ? "↑" : "↓"} ${apf(a, v)}`, pxIn: true, sub: cur ? pctStr((v / cur - 1) * 100) : null, subColor: ALERT_C, x: true, drag: true };
+  });
+}
+
 function updateMarkers(S) {
   if (!S.inst || !S.bars.length) { S.candle.setMarkers([]); return }
   const times = new Set(alertLog.filter(e => e.inst === S.inst && e.tf === S.tf && (e.kind || "ma") === "ma").map(e => Math.floor(e.ts / 1000) + TZ)
@@ -2437,8 +2520,16 @@ function updateAlertBadge() {
 
 function renderAlertPanel() {
   const ms = activeMAs(), nSlots = new Set(slots.map(S => S.inst).filter(Boolean)).size, chk = v => v ? " checked" : "";
+  const pa = palerts.slice().sort((x, y) => x.inst.localeCompare(y.inst) || y.px - x.px);
   alp.innerHTML =
-    `<div class="hd"><b>알림</b><label class="k">켜기<input type="checkbox" data-f="on"${chk(alertCfg.on)}></label></div>` +
+    `<div class="hd"><b>알림</b></div>` +
+    `<div class="sec first"><b>가격 알림</b>` +
+    (pa.length ? `<div class="wl">${pa.map(a => {
+      const cur = curPx(a.inst);
+      return `<div class="wr pa" data-pa="${esc(a.inst)}" title="누르면 그 종목을 선택한 칸에 띄움"><b>${esc(a.inst)}</b><span class="tag">${a.dir > 0 ? "↑ 돌파" : "↓ 이탈"}</span><span>${apf(a)}</span><span class="k">${cur ? pctStr((a.px / cur - 1) * 100) : ""}</span><button class="x" data-pr="${a.id}" title="알림 지우기">×</button></div>`;
+    }).join("")}</div>` : "") +
+    `<span class="k">차트를 우클릭해 '가격 알림'을 고르면 그 가격에 보라색 선이 생기고, 체결가가 닿는 순간 한 번 울린 뒤 지워집니다. 선은 끌어 옮기고 ×로 지웁니다. 아래 '켜기'와 상관없이 늘 감시해요.</span></div>` +
+    `<div class="sec"><div class="hd"><b>봉 마감 알림</b><label class="k">켜기<input type="checkbox" data-f="on"${chk(alertCfg.on)}></label></div></div>` +
     `<div class="sec first"><label><input type="checkbox" data-f="brk"${chk(alertCfg.brk)}><b>일봉 ${ind.dc.n}일 고가 돌파 · ${ind.dc.x}일 저가 이탈</b></label>` +
     `<span class="k">일봉 종가가 직전 ${ind.dc.n}일 고가를 넘으면 돌파, 그 뒤 직전 ${ind.dc.x}일 저가 아래로 마감하면 청산 알림. 돌파 알림에 청산 기준까지 거리(손절 폭)가 같이 옵니다. 기간은 지표의 돌파 채널을 씁니다. 일봉은 한국 시간 01시에 마감됩니다.</span>` +
     `<span class="k">검증(Binance 일봉 2020~2026, 수수료 0.1%): 승률 35~48%, 이긴 거래 평균이 진 거래의 3~7배. 처음 보는 15코인에서 거래당 +11%로 무작위 진입(+4%)보다 높았어요. 10번 중 6번은 지는 전략이라 손절을 지키는 게 핵심이에요.</span></div>` +
@@ -2464,7 +2555,7 @@ function renderAlertPanel() {
     `<button class="test" data-act="test" title="지금 설정으로 시험 알림을 한 번 보냅니다">시험</button></div></div>` +
     `<div class="sec"><span class="k">최근 알림 · 누르면 그 종목을 선택한 칸에 띄움</span>` +
     (alertLog.length
-      ? alertLog.slice(0, 5).map((e, i) => `<div class="rec" data-i="${i}"><span class="w">${whenStr(e.at)}</span><span class="id">${esc(e.inst)}</span><span class="tag">${e.tf} ${{ brk: "돌파", exit: "청산" }[e.kind] || "정배열"}</span><span class="p">${esc(e.px)}</span></div>`).join("")
+      ? alertLog.slice(0, 5).map((e, i) => `<div class="rec" data-i="${i}"><span class="w">${whenStr(e.at)}</span><span class="id">${esc(e.inst)}</span><span class="tag">${[e.tf, { brk: "돌파", exit: "청산", pxu: "가격 ↑", pxd: "가격 ↓" }[e.kind] || "정배열"].filter(Boolean).join(" ")}</span><span class="p">${esc(e.px)}</span></div>`).join("")
       : '<span class="k">아직 없음</span>') +
     `</div>`;
   fillWatchPrices();
@@ -2585,6 +2676,10 @@ alp.addEventListener("mousedown", e => {
 });
 
 alp.addEventListener("click", e => {
+  const pr = e.target.closest("[data-pr]");
+  if (pr) { pRemove(+pr.dataset.pr); return }
+  const pa = e.target.closest("[data-pa]");
+  if (pa) { openAlert(pa.dataset.pa, ""); return }
   const rm = e.target.closest("[data-rm]");
   if (rm) { alertCfg.watch.splice(+rm.dataset.rm, 1); saveAlert(); renderAlertPanel(); syncSubs(); return }
   if (e.target.closest("[data-act=test]")) {
@@ -2978,10 +3073,10 @@ function tWanted() {
 }
 
 function syncTradeSubs() {
-  const insts = tWanted();
-  if (!tws) { if (insts.size) tconnect(); return }
+  const insts = tWanted(), pins = palerts.map(a => a.inst);
+  if (!tws) { if (insts.size || pins.length) tconnect(); return }
   if (tws.readyState !== 1) return;
-  const want = new Set([...insts].flatMap(i => [`tickers|${i}`, `mark-price|${i}`]));
+  const want = new Set([...[...insts].flatMap(i => [`tickers|${i}`, `mark-price|${i}`]), ...pins.map(i => `tickers|${i}`)]);
   const arg = k => { const [channel, instId] = k.split("|"); return { channel, instId } };
   const add = [...want].filter(k => !tsubs.has(k)), del = [...tsubs].filter(k => !want.has(k));
   if (del.length) tws.send(JSON.stringify({ op: "unsubscribe", args: del.map(arg) }));
@@ -3006,13 +3101,14 @@ function tconnect() {
     if (m.arg.channel === "tickers") q.last = +d.last;
     else if (m.arg.channel === "mark-price") q.mark = +d.markPx;
     else return;
-    tEval(inst);
+    if (m.arg.channel === "tickers") pEval(inst);
+    if (tWanted().has(inst)) tEval(inst);
   };
   s.onclose = () => {
     if (tws !== s) return;
     clearInterval(tpingT);
     tws = null;
-    treconT = setTimeout(() => { if (tWanted().size) tconnect() }, 3000);
+    treconT = setTimeout(() => { if (tWanted().size || palerts.length) tconnect() }, 3000);
   };
   s.onerror = () => s.close();
 }
@@ -3068,7 +3164,7 @@ class TradeLayer {
       let up = 0, dn = 0;
       ctx.save();
       ctx.textBaseline = "middle";
-      for (const L of tLines(inst)) {
+      for (const L of [...tLines(inst), ...aLines(S.inst)]) {
         let y = S.candle.priceToCoordinate(L.price);
         if (y == null) continue;
         let edge = "";
@@ -3082,7 +3178,7 @@ class TradeLayer {
           ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(W, yy); ctx.stroke();
           ctx.setLineDash([]);
         }
-        const label = edge + L.label + (edge ? " " + tpf(inst, L.price) : "");
+        const label = edge + L.label + (edge && !L.pxIn ? " " + tpf(inst, L.price) : "");
         let x = placed.reduce((m, t) => Math.abs(t.y - y) < 17 ? Math.max(m, t.x2 + 4) : m, 6);
         const x0 = x;
         ctx.font = `600 11px ${font}`;
@@ -3124,7 +3220,7 @@ class TradeLayer {
 }
 
 function tAxis(S) {
-  const want = !S.rp && S.inst ? tLines(tradeInstOf(S.inst)) : [], keys = new Set();
+  const want = !S.rp && S.inst ? [...tLines(tradeInstOf(S.inst)), ...aLines(S.inst)] : [], keys = new Set();
   for (const L of want) {
     keys.add(L.key);
     const o = { price: L.price, color: L.color, lineVisible: false, axisLabelVisible: true, title: "" }, pl = S.tpl.get(L.key);
@@ -3134,7 +3230,7 @@ function tAxis(S) {
 }
 
 function tRepaint(inst) {
-  for (const S of slots) if (!inst || tradeInstOf(S.inst) === inst) { S.tlayer.requestUpdate?.(); tAxis(S) }
+  for (const S of slots) if (!inst || tradeInstOf(S.inst) === inst || S.inst === inst) { S.tlayer.requestUpdate?.(); tAxis(S) }
 }
 
 function tHover(S, pt) {
@@ -3144,19 +3240,20 @@ function tHover(S, pt) {
 }
 
 function tKeyPrice(inst, key) {
+  if (key[0] === "a") return palerts.find(a => "a" + a.id === key)?.px;
   if (key === "tp" || key === "sl") return acct.pos[inst]?.[key];
   return acct.orders.find(o => "o" + o.id === key)?.px;
 }
 
 function tPointerDown(S, pt, e) {
   if (S.rp || !S.thits.length) return false;
-  const inst = tradeInstOf(S.inst), xh = S.thits.find(h => h.xr && inside(pt, ...h.xr));
-  if (xh) { e.stopPropagation(); tRemoveLine(inst, xh.key); return true }
+  const inst = tradeInstOf(S.inst), xh = S.thits.find(h => h.xr && inside(pt, ...h.xr)), keyInst = k => k[0] === "a" ? S.inst : inst;
+  if (xh) { e.stopPropagation(); tRemoveLine(keyInst(xh.key), xh.key); return true }
   let best = null, bd = 5;
   for (const h of S.thits) if (h.drag && Math.abs(pt.y - h.y) < bd) { bd = Math.abs(pt.y - h.y); best = h }
   if (!best) return false;
   e.stopPropagation();
-  tdrag = { S, inst, key: best.key, price: tKeyPrice(inst, best.key), moved: false };
+  tdrag = { S, inst: keyInst(best.key), key: best.key, price: tKeyPrice(keyInst(best.key), best.key), moved: false };
   return true;
 }
 
@@ -3164,7 +3261,7 @@ window.addEventListener("pointermove", e => {
   if (!tdrag) return;
   const p = tdrag.S.candle.coordinateToPrice(localPt(tdrag.S.box, e).y);
   if (p == null) return;
-  tdrag.price = roundP(tdrag.inst, p);
+  tdrag.price = tdrag.key[0] === "a" ? +p.toFixed(tdrag.S.prec) : roundP(tdrag.inst, p);
   tdrag.moved = true;
   tRepaint(tdrag.inst);
 });
@@ -3178,6 +3275,7 @@ window.addEventListener("pointerup", () => {
 });
 
 function tRemoveLine(inst, key) {
+  if (key[0] === "a") { pRemove(+key.slice(1)); return }
   if (key === "tp" || key === "sl") tSetTpSl(inst, { [key]: null });
   else tCancel(+key.slice(1));
 }
@@ -3214,6 +3312,7 @@ function tSetTpSl(inst, vals) {
 }
 
 function tMoveLine(inst, key, price) {
+  if (key[0] === "a") { pMove(+key.slice(1), price); return }
   if (key === "tp" || key === "sl") { tSetTpSl(inst, { [key]: price }); return }
   const o = acct.orders.find(x => "o" + x.id === key), last = lastOf(inst);
   if (!o || !last || !(price > 0)) return;
@@ -3266,6 +3365,38 @@ function tMenuClose() {
   $("tctx").classList.remove("open");
   tr.menu = null;
   tr.quick = null;
+  tr.aq = null;
+}
+
+function aQuick(m) {
+  const S = m.S, el = $("tctx"), r = el.getBoundingClientRect();
+  tr.aq = { S };
+  el.innerHTML =
+    `<div class="qk"><div class="qh" style="color:${ALERT_C}">가격 알림<span>${esc(S.inst)}</span></div>` +
+    `<div class="fld"><span>가격</span><input id="aPx" inputmode="decimal" autocomplete="off" spellcheck="false" value="${m.price.toFixed(S.prec)}"><u>${esc(S.inst.split("-")[1] || "")}</u></div>` +
+    `<dl id="qCalc"></dl>` +
+    `<div class="qgo"><button id="aGo">알림 걸기</button><button id="qX">취소</button></div></div>`;
+  aCalc();
+  tMenuPlace(r.left, r.top);
+  $("aPx").focus();
+  $("aPx").select();
+}
+
+function aCalc() {
+  const q = tr.aq;
+  if (!q) return;
+  const cur = curPx(q.S.inst), v = num($("aPx").value), go = $("aGo");
+  const ok = cur && v > 0 && +v.toFixed(q.S.prec) !== cur;
+  $("qCalc").innerHTML = `<dt>현재가</dt><dd>${cur ? fmt(q.S, cur) : "-"}</dd>` +
+    (ok ? `<dt>거리</dt><dd>${pctStr((v / cur - 1) * 100)}</dd><dt>울릴 때</dt><dd>${v > cur ? "이 가격 이상" : "이 가격 이하"} · ${pWord(v > cur ? 1 : -1)}</dd>` : "");
+  go.disabled = !ok;
+  go.style.opacity = ok ? "" : ".5";
+}
+
+function aSubmit() {
+  const q = tr.aq, v = num($("aPx")?.value);
+  if (!q || !(v > 0)) return;
+  if (pAdd(q.S, v)) tMenuClose();
 }
 
 function tMenuPlace(x, y) {
@@ -3275,32 +3406,35 @@ function tMenuPlace(x, y) {
 }
 
 function tMenu(S, e) {
-  if (S.rp || !S.ready) return;
-  const inst = tradeInstOf(S.inst);
-  if (!inst) return;
+  if (S.rp || !S.ready || !S.inst) return;
   e.preventDefault();
   activeSlot = S;
   tRender();
-  const s = specs[inst], last = lastOf(inst), pt = localPt(S.box, e), raw = S.candle.coordinateToPrice(pt.y);
-  if (!s || !last || raw == null) { tSay(specErr[inst]?.msg || "시세를 받는 중이에요"); return }
-  const price = roundP(inst, raw), below = price < last, p = acct.pos[inst], P = tpf(inst, price);
+  const inst = tradeInstOf(S.inst), s = inst && specs[inst], last = inst && lastOf(inst), pt = localPt(S.box, e), raw = S.candle.coordinateToPrice(pt.y);
+  if (raw == null) return;
+  const trade = !!(s && last), cur = curPx(S.inst), price = trade ? roundP(inst, raw) : +raw.toFixed(S.prec);
+  const ref = trade ? last : cur, below = ref != null && price < ref, p = trade && acct.pos[inst], P = trade ? tpf(inst, price) : fmt(S, price);
   const it = (a, color, text, em) => `<div class="mi" data-a="${a}"><i style="background:${color}"></i>${text}${em ? `<em>${em}</em>` : ""}</div>`, sep = '<div class="sep"></div>';
-  let h = `<div class="hd">${P} · 현재가보다 ${below ? "아래" : "위"}</div>`;
-  h += below
-    ? it("buy-limit", C("--up"), `지정가 매수 · 롱 @ ${P}`, "금액 입력 ›") + it("sell-stop", C("--down"), `스톱 매도 · 숏 @ ${P}`, "금액 입력 ›")
-    : it("sell-limit", C("--down"), `지정가 매도 · 숏 @ ${P}`, "금액 입력 ›") + it("buy-stop", C("--up"), `스톱 매수 · 롱 @ ${P}`, "금액 입력 ›");
-  if (p) {
-    const k = (p.dir > 0) === below ? "sl" : "tp";
-    h += sep + it(k, k === "tp" ? PROFIT : LOSS, `${dirName(p.dir)} 포지션 ${k.toUpperCase()} → ${P}`, `${susd(upnlAt(p, price))} USDT`);
-  }
-  const oh = S.thits.find(x => x.key[0] === "o" && x.y != null && Math.abs(pt.y - x.y) < 6);
+  let h = `<div class="hd">${P}${ref != null ? ` · 현재가보다 ${below ? "아래" : "위"}` : ""}</div>`;
+  if (trade) {
+    h += below
+      ? it("buy-limit", C("--up"), `지정가 매수 · 롱 @ ${P}`, "금액 입력 ›") + it("sell-stop", C("--down"), `스톱 매도 · 숏 @ ${P}`, "금액 입력 ›")
+      : it("sell-limit", C("--down"), `지정가 매도 · 숏 @ ${P}`, "금액 입력 ›") + it("buy-stop", C("--up"), `스톱 매수 · 롱 @ ${P}`, "금액 입력 ›");
+    if (p) {
+      const k = (p.dir > 0) === below ? "sl" : "tp";
+      h += sep + it(k, k === "tp" ? PROFIT : LOSS, `${dirName(p.dir)} 포지션 ${k.toUpperCase()} → ${P}`, `${susd(upnlAt(p, price))} USDT`);
+    }
+  } else h += `<div class="nt">${esc(inst ? specErr[inst]?.msg || "가상 거래 시세를 받는 중이에요" : "가상 거래를 할 수 없는 종목이에요")}</div>`;
+  const near = c => S.thits.find(x => x.key[0] === c && x.y != null && Math.abs(pt.y - x.y) < 6);
+  const oh = trade && near("o"), ah = near("a");
   if (oh) h += sep + it("cancel", C("--muted"), "이 주문 취소");
-  h += sep + it("hline", C("--draw"), "여기에 수평선");
+  h += sep + (ah ? it("unalert", ALERT_C, "이 가격 알림 지우기") : cur != null ? it("alert", ALERT_C, `가격 알림 · ${P} ${pWord(price > cur ? 1 : -1)}`, "가격 입력 ›") : "");
+  h += it("hline", C("--draw"), "여기에 수평선");
   const el = $("tctx");
   el.innerHTML = h;
   el.classList.add("open");
   tMenuPlace(e.clientX + 2, e.clientY + 2);
-  tr.menu = { S, inst, price, oid: oh ? +oh.key.slice(1) : null };
+  tr.menu = { S, inst, price, oid: oh ? +oh.key.slice(1) : null, aid: ah ? +ah.key.slice(1) : null };
 }
 
 function tQuick(m, side, kind) {
@@ -3359,6 +3493,12 @@ function qSubmit() {
 }
 
 $("tctx").addEventListener("click", e => {
+  if (tr.aq) {
+    const b = e.target.closest("button");
+    if (b?.id === "aGo") aSubmit();
+    else if (b?.id === "qX") tMenuClose();
+    return;
+  }
   if (tr.quick) {
     const b = e.target.closest("button");
     if (!b) return;
@@ -3388,9 +3528,11 @@ $("tctx").addEventListener("click", e => {
   if (!mi || !m) return;
   const a = mi.dataset.a;
   if (/-(limit|stop)$/.test(a)) { const [side, kind] = a.split("-"); tQuick(m, side, kind); return }
+  if (a === "alert") { aQuick(m); return }
   tMenuClose();
   if (a === "tp" || a === "sl") tSetTpSl(m.inst, { [a]: m.price });
   else if (a === "cancel") tCancel(m.oid);
+  else if (a === "unalert") pRemove(m.aid);
   else if (a === "hline") {
     if (!m.S.inst) return;
     pushDrawHist(m.S.inst);
@@ -3400,15 +3542,20 @@ $("tctx").addEventListener("click", e => {
   }
 });
 
-$("tctx").addEventListener("input", () => qCalc());
+$("tctx").addEventListener("input", () => tr.aq ? aCalc() : qCalc());
 $("tctx").addEventListener("keydown", e => {
+  if (tr.aq) {
+    if (e.key === "Enter") { e.preventDefault(); aSubmit() }
+    else if (e.key === "Escape") { e.preventDefault(); tMenuClose() }
+    return;
+  }
   if (!tr.quick) return;
   if (e.key === "Enter") { e.preventDefault(); qSubmit() }
   else if (e.key === "Escape") { e.preventDefault(); tMenuClose() }
 });
 
 document.addEventListener("mousedown", e => { if (!$("tctx").contains(e.target)) tMenuClose() });
-document.addEventListener("wheel", e => { if (!tr.quick) tMenuClose() }, { passive: true });
+document.addEventListener("wheel", e => { if (!tr.quick && !tr.aq) tMenuClose() }, { passive: true });
 
 function tRender() {
   const S = curSlot(), inst = tradeInstOf(S?.inst);
@@ -3734,6 +3881,7 @@ layout();
 refreshWatchers();
 slots.forEach(loadSlot);
 connect();
+syncTradeSubs();
 for (const inst of tWanted()) loadSpec(inst);
 setTrade(tr.on, false);
 setInterval(tRender, 500);
