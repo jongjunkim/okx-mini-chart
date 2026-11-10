@@ -300,7 +300,7 @@ body.trading #dock{display:flex}
 </head>
 <body>
 <nav>
-  <button class="tool" data-mode="h" title="수평선(지지·저항): 누른 뒤 차트를 클릭">수평</button><button class="tool" data-mode="t" title="추세선: 누른 뒤 두 점을 클릭">추세</button><button class="tool" data-mode="r" title="가격 범위: 누른 뒤 두 점을 클릭하면 가격 차이·변동률·봉 수를 보여줍니다">범위</button><button class="tool" data-mode="L" title="롱 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">롱</button><button class="tool" data-mode="S" title="숏 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">숏</button><button id="drawUndo" class="dbtn" title="그린 선 되돌리기 (⌘Z)" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button><button id="drawRedo" class="dbtn" title="그린 선 다시 실행 (⌘⇧Z)" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button><button id="drawLock" class="dbtn"></button><button class="tool" data-mode="P" title="리플레이: 누른 뒤 시작할 봉을 클릭. 그 봉까지만 보이고 한 봉씩 넘겨 봅니다">리플레이</button><button id="indBtn" title="이동평균·볼린저밴드·RSI·돌파 채널">지표</button><button id="topBtn" title="24시간 거래대금 상위 10종목. 누르면 선택한 칸에 띄웁니다">TOP10</button><button id="shotBtn" title="차트 캡처(⌘S): 칸이 여러 개면 찍을 차트를 클릭합니다. 창 전체는 ⌘⇧S. 바탕화면에 저장하고 클립보드에도 복사합니다">캡처</button><button id="alBtn" title="이동평균 정배열·일봉 돌파 알림"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>알림<span id="alBadge"></span></button><button id="tradeBtn" title="가상 거래 주문 패널·포지션 창 열고 닫기. 차트 우클릭 주문과 포지션 선은 패널을 닫아도 쓸 수 있습니다. 실제 주문은 나가지 않습니다">거래</button>
+  <button class="tool" data-mode="h" title="수평선(지지·저항): 누른 뒤 차트를 클릭">수평</button><button class="tool" data-mode="t" title="추세선: 누른 뒤 두 점을 클릭">추세</button><button class="tool" data-mode="r" title="가격 범위: 누른 뒤 두 점을 클릭하면 가격 차이·변동률·봉 수를 보여줍니다">범위</button><button class="tool" data-mode="L" title="롱 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">롱</button><button class="tool" data-mode="S" title="숏 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">숏</button><button class="tool" data-mode="F" title="펜: 누른 채 끌면 자유롭게 그려집니다. 다시 누르거나 Esc 로 끝낼 때까지 계속 그릴 수 있습니다">펜</button><button id="drawUndo" class="dbtn" title="그린 선 되돌리기 (⌘Z)" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button><button id="drawRedo" class="dbtn" title="그린 선 다시 실행 (⌘⇧Z)" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button><button id="drawLock" class="dbtn"></button><button class="tool" data-mode="P" title="리플레이: 누른 뒤 시작할 봉을 클릭. 그 봉까지만 보이고 한 봉씩 넘겨 봅니다">리플레이</button><button id="indBtn" title="이동평균·볼린저밴드·RSI·돌파 채널">지표</button><button id="topBtn" title="24시간 거래대금 상위 10종목. 누르면 선택한 칸에 띄웁니다">TOP10</button><button id="shotBtn" title="차트 캡처(⌘S): 칸이 여러 개면 찍을 차트를 클릭합니다. 창 전체는 ⌘⇧S. 바탕화면에 저장하고 클립보드에도 복사합니다">캡처</button><button id="alBtn" title="이동평균 정배열·일봉 돌파 알림"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>알림<span id="alBadge"></span></button><button id="tradeBtn" title="가상 거래 주문 패널·포지션 창 열고 닫기. 차트 우클릭 주문과 포지션 선은 패널을 닫아도 쓸 수 있습니다. 실제 주문은 나가지 않습니다">거래</button>
   <span id="balChip" title="자산 탭 열기">가상 잔고 <b id="balTxt">0.00</b> USDT</span>
   <span id="dot" title="실시간 연결"></span>
   <div id="indp"></div>
@@ -391,7 +391,7 @@ const rsiColor = () => ind.rsi.color || RSI_COLOR;
 const dcColor = () => ind.dc.color || DC_COLOR;
 
 let slots = [], activeSlot = null, nextId = 1;
-let mode = null, pending = null, preview = null, selected = null, selectedInst = null, drag = null;
+let mode = null, pending = null, preview = null, selected = null, selectedInst = null, drag = null, pen = null;
 let ws = null, subs = new Set(), pingT = null, reconnectT = null, warmChain = Promise.resolve();
 const drawCache = {};
 
@@ -519,7 +519,10 @@ function timeToX(S, t) {
     while (hi - lo > 1) { const m = (lo + hi) >> 1; if (bars[m].time <= t) lo = m; else hi = m }
     lg = lo + (t - bars[lo].time) / (bars[hi].time - bars[lo].time);
   }
-  return S.chart.timeScale().logicalToCoordinate(lg);
+  const ts = S.chart.timeScale(), i = Math.floor(lg), x = ts.logicalToCoordinate(i);
+  if (x == null || lg === i) return x;
+  const x2 = ts.logicalToCoordinate(i + 1);
+  return x2 == null ? x : x + (lg - i) * (x2 - x);
 }
 
 function pointToTP(S, pt) {
@@ -528,6 +531,22 @@ function pointToTP(S, pt) {
   const i = Math.round(lg), iv = SEC[S.tf];
   const t = i < 0 ? S.bars[0].time + i * iv : i >= n ? S.bars[n - 1].time + (i - n + 1) * iv : S.bars[i].time;
   return { t, p: +p.toFixed(S.prec) };
+}
+
+function pointToTPf(S, pt) {
+  const ts = S.chart.timeScale(), a = ts.logicalToCoordinate(0), b = ts.logicalToCoordinate(1), p = S.candle.coordinateToPrice(pt.y);
+  const bars = S.bars, n = bars.length, iv = SEC[S.tf];
+  if (a == null || b == null || b === a || p == null || !n) return null;
+  const lg = (pt.x - a) / (b - a), i = Math.floor(lg);
+  const t = i < 0 ? bars[0].time + lg * iv : i >= n - 1 ? bars[n - 1].time + (lg - n + 1) * iv : bars[i].time + (lg - i) * (bars[i + 1].time - bars[i].time);
+  return { t: Math.round(t), p: +p.toFixed(S.prec + 2) };
+}
+
+function freeXY(S, d) {
+  return d.pts.map(([t, p]) => {
+    const x = timeToX(S, t), y = S.candle.priceToCoordinate(p);
+    return x == null || y == null ? null : [x, y];
+  });
 }
 
 function rayXY(S, d, width) {
@@ -619,6 +638,20 @@ function drawTrend(ctx, S, d, temp, sel, width) {
   }
 }
 
+function drawFree(ctx, S, d, sel) {
+  ctx.strokeStyle = C("--draw");
+  ctx.lineWidth = sel ? 3 : 2;
+  ctx.lineJoin = ctx.lineCap = "round";
+  ctx.beginPath();
+  let on = false;
+  for (const q of freeXY(S, d)) {
+    if (!q) { on = false; continue }
+    if (on) ctx.lineTo(q[0], q[1]); else ctx.moveTo(q[0], q[1]);
+    on = true;
+  }
+  ctx.stroke();
+}
+
 function drawRange(ctx, S, d, temp, sel, width) {
   const g = boxXY(S, d);
   if (!g) return;
@@ -676,10 +709,12 @@ class DrawLayer {
         const q = preview || pending;
         list.push([{ type: mode, t1: pending.t, p1: pending.p, t2: q.t, p2: q.p }, true]);
       }
+      if (pen && pen.S.inst === S.inst) list.push([pen.d, true]);
       for (const [d, temp] of list) {
         const sel = d === selected;
         ctx.save();
-        if (d.type === "t") drawTrend(ctx, S, d, temp, sel, W);
+        if (d.type === "f") drawFree(ctx, S, d, sel);
+        else if (d.type === "t") drawTrend(ctx, S, d, temp, sel, W);
         else if (d.type === "r") drawRange(ctx, S, d, temp, sel, W);
         else drawPosition(ctx, S, d, sel, W);
         ctx.restore();
@@ -847,7 +882,7 @@ function makeSlot(cfg, beforeEl) {
   });
   S.chart.subscribeClick(p => onChartClick(S, p));
   S.box.addEventListener("pointerdown", e => onPointerDown(S, e), true);
-  S.box.addEventListener("mousedown", e => { if (drag || tdrag) e.stopPropagation() }, true);
+  S.box.addEventListener("mousedown", e => { if (drag || tdrag || pen) e.stopPropagation() }, true);
   S.box.addEventListener("contextmenu", e => tMenu(S, e));
   S.box.addEventListener("pointermove", e => {
     if (!drag && !tdrag && !mode) setHoverCursor(S, e);
@@ -1341,6 +1376,7 @@ const HINTS = {
   r: "가격 범위: 시작점과 끝점을 차례로 클릭하세요 · Esc 취소",
   L: "롱 포지션: 진입가를 클릭하세요 · 생긴 뒤 목표·손절선을 끌어 조정 · Esc 취소",
   S: "숏 포지션: 진입가를 클릭하세요 · 생긴 뒤 목표·손절선을 끌어 조정 · Esc 취소",
+  F: "펜: 누른 채 끌어 그리세요 · ⌘Z 로 한 획씩 되돌리기 · 펜을 다시 누르거나 Esc 로 끝내기",
   P: "리플레이: 시작할 봉을 클릭하세요 · 그 봉까지만 보이고 뒤는 가려집니다 · Esc 취소",
   sel: "선택됨: 끌어서 조정하고 Backspace 로 지웁니다 · Esc 선택 해제"
 };
@@ -1353,6 +1389,7 @@ function updateHint() {
 
 function setMode(m) {
   mode = m; pending = null; preview = null;
+  if (pen) { const inst = pen.S.inst; pen = null; repaint(inst) }
   if (m) { selected = null; selectedInst = null }
   if (m !== "P") slots.forEach(x => x.el.classList.remove("cutting"));
   document.querySelectorAll(".rpb [data-rp=pick]").forEach(x => x.classList.toggle("on", m === "P"));
@@ -1388,6 +1425,9 @@ function hitTest(S, pt) {
     if (d.type === "h") {
       const y = S.candle.priceToCoordinate(d.price);
       if (y != null) consider(d, "h", Math.abs(y - pt.y));
+    } else if (d.type === "f") {
+      const q = freeXY(S, d);
+      for (let i = 1; i < q.length; i++) if (q[i - 1] && q[i]) consider(d, "body", distToSeg(pt.x, pt.y, [...q[i - 1], ...q[i]]) - 1);
     } else if (d.type === "t") {
       const r = rayXY(S, d, S.layer.width || 10000);
       if (!r) continue;
@@ -1431,6 +1471,7 @@ function setHoverCursor(S, e) {
 }
 
 function onPointerDown(S, e) {
+  if (mode === "F" && e.button === 0 && S.ready && S.inst) { penStart(S, e); return }
   if (mode || e.button !== 0 || !S.ready) return;
   const pt = localPt(S.box, e);
   if (pt.x > S.layer.width) return;
@@ -1441,6 +1482,40 @@ function onPointerDown(S, e) {
   select(hit.d, S.inst);
   drag = { S, d: hit.d, part: hit.part, orig: { ...hit.d }, before: snapDrawings(S.inst), tp0: pointToTP(S, pt), moved: false };
 }
+
+function penStart(S, e) {
+  const pt = localPt(S.box, e);
+  if (pt.x > S.layer.width) return;
+  const tp = pointToTPf(S, pt);
+  if (!tp) return;
+  e.stopPropagation();
+  pen = { S, d: { type: "f", pts: [[tp.t, tp.p]] }, last: pt };
+}
+
+window.addEventListener("pointermove", e => {
+  if (!pen) return;
+  const { S } = pen, pt = localPt(S.box, e);
+  pt.x = Math.max(0, Math.min(S.layer.width, pt.x));
+  pt.y = Math.max(0, Math.min(S.box.clientHeight, pt.y));
+  if (Math.hypot(pt.x - pen.last.x, pt.y - pen.last.y) < 2) return;
+  const tp = pointToTPf(S, pt);
+  if (!tp) return;
+  pen.d.pts.push([tp.t, tp.p]);
+  pen.last = pt;
+  repaint(S.inst);
+});
+
+window.addEventListener("pointerup", () => {
+  if (!pen) return;
+  const { S, d } = pen;
+  pen = null;
+  if (d.pts.length > 1) {
+    pushDrawHist(S.inst);
+    drawingsOf(S.inst).push(d);
+    saveDrawings(S.inst);
+  }
+  repaint(S.inst);
+});
 
 function moveHline(inst, d) {
   const i = drawingsOf(inst).filter(x => x.type === "h").indexOf(d);
@@ -1461,6 +1536,7 @@ window.addEventListener("pointermove", e => {
   else if (part === "tp") d.tp = rp(long ? Math.max(tp.p, d.entry + tick) : Math.min(tp.p, d.entry - tick));
   else if (part === "sl") d.sl = rp(long ? Math.min(tp.p, d.entry - tick) : Math.max(tp.p, d.entry + tick));
   else if (part === "w") d.t2 = Math.max(tp.t, d.t1 + SEC[S.tf]);
+  else if (d.type === "f") d.pts = orig.pts.map(([t, p]) => [t + dt, +(p + dp).toFixed(S.prec + 2)]);
   else if (pos) {
     d.t1 = orig.t1 + dt; d.t2 = orig.t2 + dt;
     d.entry = rp(orig.entry + dp); d.tp = rp(orig.tp + dp); d.sl = rp(orig.sl + dp);
@@ -1487,7 +1563,7 @@ function newPosition(S, type, tp) {
 }
 
 function onChartClick(S, param) {
-  if (!mode || !param.point || !S.ready) return;
+  if (!mode || mode === "F" || !param.point || !S.ready) return;
   if (mode === "P") { rpStartAt(S, param.point.x); setMode(null); return }
   const tp = pointToTP(S, param.point);
   if (!tp) return;
