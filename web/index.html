@@ -300,7 +300,7 @@ body.trading #dock{display:flex}
 </head>
 <body>
 <nav>
-  <button class="tool" data-mode="h" title="수평선(지지·저항): 누른 뒤 차트를 클릭">수평</button><button class="tool" data-mode="t" title="추세선: 누른 뒤 두 점을 클릭">추세</button><button class="tool" data-mode="r" title="가격 범위: 누른 뒤 두 점을 클릭하면 가격 차이·변동률·봉 수를 보여줍니다">범위</button><button class="tool" data-mode="L" title="롱 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">롱</button><button class="tool" data-mode="S" title="숏 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">숏</button><button class="tool" data-mode="F" title="펜: 누른 채 끌면 자유롭게 그려집니다. 다시 누르거나 Esc 로 끝낼 때까지 계속 그릴 수 있습니다">펜</button><button id="drawUndo" class="dbtn" title="그린 선 되돌리기 (⌘Z)" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button><button id="drawRedo" class="dbtn" title="그린 선 다시 실행 (⌘⇧Z)" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button><button id="drawLock" class="dbtn"></button><button class="tool" data-mode="P" title="리플레이: 누른 뒤 시작할 봉을 클릭. 그 봉까지만 보이고 한 봉씩 넘겨 봅니다">리플레이</button><button id="indBtn" title="이동평균·볼린저밴드·RSI·돌파 채널">지표</button><button id="topBtn" title="24시간 거래대금 상위 10종목. 누르면 선택한 칸에 띄웁니다">TOP10</button><button id="shotBtn" title="차트 캡처(⌘S): 칸이 여러 개면 찍을 차트를 클릭합니다. 창 전체는 ⌘⇧S. 바탕화면에 저장하고 클립보드에도 복사합니다">캡처</button><button id="alBtn" title="이동평균 정배열·일봉 돌파 알림"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>알림<span id="alBadge"></span></button><button id="tradeBtn" title="가상 거래 주문 패널·포지션 창 열고 닫기. 차트 우클릭 주문과 포지션 선은 패널을 닫아도 쓸 수 있습니다. 실제 주문은 나가지 않습니다">거래</button>
+  <button class="tool" data-mode="h" title="수평선(지지·저항): 누른 뒤 차트를 클릭">수평</button><button class="tool" data-mode="t" title="추세선: 누른 뒤 두 점을 클릭">추세</button><button class="tool" data-mode="c" title="피보나치 채널(1:1:1:1:1): 누른 뒤 기준선 두 점과 폭이 될 점을 차례로 클릭. 그 폭으로 같은 간격 5칸이 쌓입니다">채널</button><button class="tool" data-mode="r" title="가격 범위: 누른 뒤 두 점을 클릭하면 가격 차이·변동률·봉 수를 보여줍니다">범위</button><button class="tool" data-mode="L" title="롱 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">롱</button><button class="tool" data-mode="S" title="숏 포지션: 누른 뒤 진입가를 클릭. 목표·손절선을 끌어 손익비를 맞춥니다">숏</button><button class="tool" data-mode="F" title="펜: 누른 채 끌면 자유롭게 그려집니다. 다시 누르거나 Esc 로 끝낼 때까지 계속 그릴 수 있습니다">펜</button><button id="drawUndo" class="dbtn" title="그린 선 되돌리기 (⌘Z)" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button><button id="drawRedo" class="dbtn" title="그린 선 다시 실행 (⌘⇧Z)" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button><button id="drawLock" class="dbtn"></button><button class="tool" data-mode="P" title="리플레이: 누른 뒤 시작할 봉을 클릭. 그 봉까지만 보이고 한 봉씩 넘겨 봅니다">리플레이</button><button id="indBtn" title="이동평균·볼린저밴드·RSI·돌파 채널">지표</button><button id="topBtn" title="24시간 거래대금 상위 10종목. 누르면 선택한 칸에 띄웁니다">TOP10</button><button id="shotBtn" title="차트 캡처(⌘S): 칸이 여러 개면 찍을 차트를 클릭합니다. 창 전체는 ⌘⇧S. 바탕화면에 저장하고 클립보드에도 복사합니다">캡처</button><button id="alBtn" title="이동평균 정배열·일봉 돌파 알림"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>알림<span id="alBadge"></span></button><button id="tradeBtn" title="가상 거래 주문 패널·포지션 창 열고 닫기. 차트 우클릭 주문과 포지션 선은 패널을 닫아도 쓸 수 있습니다. 실제 주문은 나가지 않습니다">거래</button>
   <span id="balChip" title="자산 탭 열기">가상 잔고 <b id="balTxt">0.00</b> USDT</span>
   <span id="dot" title="실시간 연결"></span>
   <div id="indp"></div>
@@ -366,7 +366,7 @@ const BB_COLOR = "#8a94a6";
 const RSI_COLOR = "#e879f9";
 const DC_COLOR = "#38bdf8";
 const PROFIT = "#26a69a", LOSS = "#ef5350", ENTRY = "#9aa3af";
-const TWO_CLICK = ["t", "r"];
+const CLICK_TOOLS = ["t", "r", "c"], CHAN_LEVELS = [0, 1, 2, 3, 4, 5];
 const BT_LEVS = [1, 2, 3, 5, 10, 20, 50, 100], BT_PCTS = [10, 25, 50, 100], BT_MMR = 0.004;
 const RP_SPEEDS = [[1000, "초당 1봉"], [333, "초당 3봉"], [100, "초당 10봉"]];
 const store = {
@@ -559,6 +559,20 @@ function rayXY(S, d, width) {
   return { seg: [x1, y1, width, y1 + (y2 - y1) * (width - x1) / (x2 - x1)], anchors };
 }
 
+function chanXY(S, d, width) {
+  const x1 = timeToX(S, d.t1), x2 = timeToX(S, d.t2), x3 = timeToX(S, d.t3);
+  const y1 = S.candle.priceToCoordinate(d.p1), y2 = S.candle.priceToCoordinate(d.p2), y3 = S.candle.priceToCoordinate(d.p3);
+  if ([x1, x2, x3, y1, y2, y3].some(v => v == null)) return null;
+  const k = Math.abs(x2 - x1) < 0.5 ? 0 : (y2 - y1) / (x2 - x1), at = x => S.candle.coordinateToPrice(y1 + k * (x - x1));
+  const xs = Math.min(x1, x2), b3 = at(x3), pa = at(xs), pb = at(width);
+  const last = S.bars.length ? timeToX(S, S.bars[S.bars.length - 1].time) : null, pl = last == null ? null : at(last);
+  if ([b3, pa, pb].some(v => v == null)) return null;
+  const w = d.p3 - b3, y = v => S.candle.priceToCoordinate(v);
+  const lines = CHAN_LEVELS.map(l => ({ l, ya: y(pa + l * w), yb: y(pb + l * w), price: pl == null ? null : pl + l * w }));
+  if (lines.some(q => q.ya == null || q.yb == null)) return null;
+  return { xs, w, lines, anchors: [[x1, y1], [x2, y2], [x3, y3]] };
+}
+
 function distToSeg(px, py, [x1, y1, x2, y2]) {
   const dx = x2 - x1, dy = y2 - y1, l = dx * dx + dy * dy;
   const u = l ? Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / l)) : 0;
@@ -638,6 +652,46 @@ function drawTrend(ctx, S, d, temp, sel, width) {
   }
 }
 
+function drawChannel(ctx, S, d, temp, sel, width, height) {
+  const g = chanXY(S, d, width);
+  if (!g) return;
+  const col = C("--draw"), L = g.lines;
+  for (let i = 1; i < L.length; i++) {
+    ctx.fillStyle = col + (i % 2 ? "1f" : "0f");
+    ctx.beginPath();
+    ctx.moveTo(g.xs, L[i - 1].ya); ctx.lineTo(width, L[i - 1].yb); ctx.lineTo(width, L[i].yb); ctx.lineTo(g.xs, L[i].ya);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.strokeStyle = col;
+  ctx.setLineDash(temp ? [4, 4] : []);
+  for (const q of L) {
+    ctx.globalAlpha = q.l ? 0.75 : 1;
+    ctx.lineWidth = (q.l ? 1 : 1.5) + (sel ? 1 : 0);
+    ctx.beginPath(); ctx.moveTo(g.xs, q.ya); ctx.lineTo(width, q.yb); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  ctx.setLineDash([]);
+  ctx.font = "600 10px -apple-system, BlinkMacSystemFont, sans-serif";
+  ctx.textBaseline = "middle";
+  for (const q of L) {
+    if (q.price == null || q.yb < 8 || q.yb > height - 8) continue;
+    const t = `${q.l}  ${fmt(S, q.price)}`, w = ctx.measureText(t).width + 8, x = width - w - 4;
+    ctx.fillStyle = C("--bg") + "dd";
+    ctx.fillRect(x, q.yb - 8, w, 16);
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, q.yb - 7.5, w - 1, 15);
+    ctx.fillStyle = col;
+    ctx.fillText(t, x + 4, q.yb + 0.5);
+  }
+  if (temp) return;
+  for (const [x, y] of g.anchors) {
+    ctx.beginPath(); ctx.arc(x, y, sel ? 4.5 : 2.5, 0, Math.PI * 2);
+    if (sel) { ctx.fillStyle = C("--bg"); ctx.fill(); ctx.lineWidth = 2; ctx.stroke() }
+    else { ctx.fillStyle = col; ctx.fill() }
+  }
+}
+
 function drawFree(ctx, S, d, sel) {
   ctx.strokeStyle = C("--draw");
   ctx.lineWidth = sel ? 3 : 2;
@@ -705,9 +759,10 @@ class DrawLayer {
       const S = this.S, W = this.width = mediaSize.width;
       if (!S.inst) return;
       const list = drawingsOf(S.inst).filter(d => d.type !== "h").map(d => [d, false]);
-      if (pending && pending.inst === S.inst && TWO_CLICK.includes(mode)) {
-        const q = preview || pending;
-        list.push([{ type: mode, t1: pending.t, p1: pending.p, t2: q.t, p2: q.p }, true]);
+      if (pending && pending.inst === S.inst && CLICK_TOOLS.includes(mode)) {
+        const q = preview || pending, b = pending.b;
+        list.push([mode === "c" && b ? { type: "c", t1: pending.t, p1: pending.p, t2: b.t, p2: b.p, t3: q.t, p3: q.p }
+          : { type: mode === "c" ? "t" : mode, t1: pending.t, p1: pending.p, t2: q.t, p2: q.p }, true]);
       }
       if (pen && pen.S.inst === S.inst) list.push([pen.d, true]);
       for (const [d, temp] of list) {
@@ -716,6 +771,7 @@ class DrawLayer {
         if (d.type === "f") drawFree(ctx, S, d, sel);
         else if (d.type === "t") drawTrend(ctx, S, d, temp, sel, W);
         else if (d.type === "r") drawRange(ctx, S, d, temp, sel, W);
+        else if (d.type === "c") drawChannel(ctx, S, d, temp, sel, W, mediaSize.height);
         else drawPosition(ctx, S, d, sel, W);
         ctx.restore();
       }
@@ -757,7 +813,7 @@ function stepDrawHist(back) {
   const h = from.pop();
   to.push({ inst: h.inst, before: snapDrawings(h.inst) });
   if (selectedInst === h.inst) { selected = null; selectedInst = null; updateHint() }
-  if (pending?.inst === h.inst) { pending = null; preview = null }
+  if (pending?.inst === h.inst) { pending = null; preview = null; updateHint() }
   drawCache[h.inst] = JSON.parse(h.before);
   saveDrawings(h.inst);
   syncDrawings(h.inst);
@@ -877,7 +933,7 @@ function makeSlot(cfg, beforeEl) {
     S.hover = !!c;
     if (c) renderLbl(S, idxOfTime(S.bars, p.time), `시 ${fmt(S, c.open)} 고 ${fmt(S, c.high)} 저 ${fmt(S, c.low)} 종 ${fmt(S, c.close)} · 량 ${v ? fv(v.value) : "-"}`);
     else showLbl(S);
-    if (TWO_CLICK.includes(mode) && pending && pending.inst === S.inst && p.point) { preview = pointToTP(S, p.point) || preview; repaint(S.inst) }
+    if (CLICK_TOOLS.includes(mode) && pending && pending.inst === S.inst && p.point) { preview = pointToTP(S, p.point) || preview; repaint(S.inst) }
     if (mode === "P") moveCut(S, p.point);
   });
   S.chart.subscribeClick(p => onChartClick(S, p));
@@ -1374,6 +1430,8 @@ const HINTS = {
   h: "수평선: 차트를 클릭하면 그 가격에 선이 생깁니다 · Esc 취소",
   t: "추세선: 시작점과 끝점을 차례로 클릭하세요 · Esc 취소",
   r: "가격 범위: 시작점과 끝점을 차례로 클릭하세요 · Esc 취소",
+  c: "채널: 기준선의 시작점과 끝점을 차례로 클릭하세요 · Esc 취소",
+  c2: "채널: 폭이 될 자리를 클릭하세요 · 그 폭으로 같은 간격 5칸이 쌓입니다 · Esc 취소",
   L: "롱 포지션: 진입가를 클릭하세요 · 생긴 뒤 목표·손절선을 끌어 조정 · Esc 취소",
   S: "숏 포지션: 진입가를 클릭하세요 · 생긴 뒤 목표·손절선을 끌어 조정 · Esc 취소",
   F: "펜: 누른 채 끌어 그리세요 · ⌘Z 로 한 획씩 되돌리기 · 펜을 다시 누르거나 Esc 로 끝내기",
@@ -1382,7 +1440,7 @@ const HINTS = {
 };
 
 function updateHint() {
-  const h = mode ? HINTS[mode] : selected ? HINTS.sel : "";
+  const h = mode ? HINTS[mode === "c" && pending?.b ? "c2" : mode] : selected ? HINTS.sel : "";
   $("hint").textContent = h;
   document.body.classList.toggle("hinting", !!h);
 }
@@ -1433,6 +1491,11 @@ function hitTest(S, pt) {
       if (!r) continue;
       r.anchors.forEach(([x, y], i) => consider(d, i ? "a2" : "a1", near(x, y)));
       consider(d, "body", distToSeg(pt.x, pt.y, r.seg));
+    } else if (d.type === "c") {
+      const W = S.layer.width || 10000, g = chanXY(S, d, W);
+      if (!g) continue;
+      g.anchors.forEach(([x, y], i) => consider(d, "a" + (i + 1), near(x, y)));
+      for (const q of g.lines) consider(d, "body", distToSeg(pt.x, pt.y, [g.xs, q.ya, W, q.yb]));
     } else if (d.type === "r") {
       const g = boxXY(S, d);
       if (!g) continue;
@@ -1465,7 +1528,7 @@ function setHoverCursor(S, e) {
   const pt = localPt(S.box, e), th = pt.x <= S.layer.width ? tHover(S, pt) : null;
   const part = th || drawLocked ? null : pt.x <= S.layer.width ? hitTest(S, pt)?.part : null;
   S.box.classList.toggle("hov-ns", th === "ns" || part === "h" || part === "tp" || part === "sl");
-  S.box.classList.toggle("hov-pt", th === "x" || part === "a1" || part === "a2");
+  S.box.classList.toggle("hov-pt", th === "x" || part === "a1" || part === "a2" || part === "a3");
   S.box.classList.toggle("hov-ew", part === "w");
   S.box.classList.toggle("hov-move", part === "body");
 }
@@ -1531,8 +1594,13 @@ window.addEventListener("pointermove", e => {
   if (part === "h") { d.price = tp.p; moveHline(S.inst, d); return }
   const dt = tp.t - tp0.t, dp = tp.p - tp0.p, tick = 10 ** -S.prec, rp = v => +v.toFixed(S.prec);
   const pos = d.type === "L" || d.type === "S", long = d.type === "L";
-  if (part === "a1") { d.t1 = tp.t; d.p1 = tp.p }
-  else if (part === "a2") { d.t2 = tp.t; d.p2 = tp.p }
+  if (part === "a1" || part === "a2") {
+    const w0 = d.type === "c" ? chanXY(S, orig, 0)?.w : null;
+    if (part === "a1") { d.t1 = tp.t; d.p1 = tp.p } else { d.t2 = tp.t; d.p2 = tp.p }
+    const w = w0 == null ? null : chanXY(S, d, 0)?.w;
+    if (w != null) d.p3 = rp(d.p3 + w0 - w);
+  }
+  else if (part === "a3") { d.t3 = tp.t; d.p3 = tp.p }
   else if (part === "tp") d.tp = rp(long ? Math.max(tp.p, d.entry + tick) : Math.min(tp.p, d.entry - tick));
   else if (part === "sl") d.sl = rp(long ? Math.min(tp.p, d.entry - tick) : Math.max(tp.p, d.entry + tick));
   else if (part === "w") d.t2 = Math.max(tp.t, d.t1 + SEC[S.tf]);
@@ -1543,6 +1611,7 @@ window.addEventListener("pointermove", e => {
   } else {
     d.t1 = orig.t1 + dt; d.t2 = orig.t2 + dt;
     d.p1 = rp(orig.p1 + dp); d.p2 = rp(orig.p2 + dp);
+    if (d.type === "c") { d.t3 = orig.t3 + dt; d.p3 = rp(orig.p3 + dp) }
   }
   repaint(S.inst);
 });
@@ -1575,6 +1644,11 @@ function onChartClick(S, param) {
   } else if (!pending || pending.inst !== S.inst) {
     pending = { ...tp, inst: S.inst }; preview = tp; repaint(S.inst);
     return;
+  } else if (mode === "c" && !pending.b) {
+    pending.b = tp; preview = tp; updateHint(); repaint(S.inst);
+    return;
+  } else if (mode === "c") {
+    d = { type: "c", t1: pending.t, p1: pending.p, t2: pending.b.t, p2: pending.b.p, t3: tp.t, p3: tp.p };
   } else {
     d = { type: mode, t1: pending.t, p1: pending.p, t2: tp.t, p2: tp.p };
   }
