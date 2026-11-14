@@ -7,6 +7,15 @@
 <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <style>
 :root{--bg:#0f1115;--panel:#161a21;--head:#12151b;--line:#232831;--text:#d6dae1;--muted:#7d8592;--up:#f04452;--down:#3182f6;--draw:#e0b341;--profit:#26a69a;--loss:#ef5350}
+html.disguise{--text:#9a9da2;--muted:#62666c;--up:#7a7d82;--down:#4f5257;--draw:#6b6f75;--profit:#7a7d82;--loss:#4f5257}
+html.disguise nav{opacity:0;transition:opacity .15s}
+html.disguise nav:hover,html.disguise nav:focus-within{opacity:1}
+html.disguise .sym,html.disguise .pc,html.disguise .bell{display:none}
+main{counter-reset:slot}
+.slot{counter-increment:slot}
+.alias{display:none;width:140px;padding:3px 6px;color:var(--text);font-weight:500}
+.alias::before{content:"gw-0" counter(slot)}
+html.disguise .alias{display:block}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:12px -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif}
 body{display:flex;flex-direction:column}
@@ -365,7 +374,8 @@ const MA_COLORS = ["#f5c542", "#c77dff", "#2ec4b6", "#ff8c42"];
 const BB_COLOR = "#8a94a6";
 const RSI_COLOR = "#e879f9";
 const DC_COLOR = "#38bdf8";
-const PROFIT = "#26a69a", LOSS = "#ef5350", ENTRY = "#9aa3af";
+const DIS_MA = ["#5d6167", "#71757b", "#868a90", "#9a9ea4"];
+let PROFIT, LOSS, ENTRY;
 const CLICK_TOOLS = ["t", "r", "c"], CHAN_LEVELS = [0, 1, 2, 3, 4, 5];
 const BT_LEVS = [1, 2, 3, 5, 10, 20, 50, 100], BT_PCTS = [10, 25, 50, 100], BT_MMR = 0.004;
 const RP_SPEEDS = [[1000, "초당 1봉"], [333, "초당 3봉"], [100, "초당 10봉"]];
@@ -373,6 +383,8 @@ const store = {
   get(k, d) { try { return localStorage.getItem(k) || d } catch (e) { return d } },
   set(k, v) { try { localStorage.setItem(k, v) } catch (e) {} }
 };
+let disguised = store.get("okx.disguise", "") === "1";
+document.documentElement.classList.toggle("disguise", disguised);
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
@@ -385,10 +397,20 @@ let ind = (() => {
 })();
 ind.rsi = ind.rsi || { on: false, n: 14 };
 ind.dc = ind.dc || { on: false, n: 20, x: 10 };
-const maColor = k => ind.ma[k].color || MA_COLORS[k];
-const bbColor = () => ind.bb.color || BB_COLOR;
-const rsiColor = () => ind.rsi.color || RSI_COLOR;
-const dcColor = () => ind.dc.color || DC_COLOR;
+const maColor = k => disguised ? DIS_MA[k] : ind.ma[k].color || MA_COLORS[k];
+const bbColor = () => disguised ? DIS_MA[0] : ind.bb.color || BB_COLOR;
+const rsiColor = () => disguised ? DIS_MA[1] : ind.rsi.color || RSI_COLOR;
+const dcColor = () => disguised ? DIS_MA[2] : ind.dc.color || DC_COLOR;
+const candleOpts = () => disguised
+  ? { upColor: "rgba(0,0,0,0)", downColor: C("--down"), borderVisible: true, borderUpColor: C("--up"), borderDownColor: C("--down"), wickUpColor: C("--up"), wickDownColor: C("--down") }
+  : { upColor: C("--up"), downColor: C("--down"), borderVisible: false, wickUpColor: C("--up"), wickDownColor: C("--down") };
+
+function setPalette() {
+  PROFIT = disguised ? "#7a7d82" : "#26a69a";
+  LOSS = disguised ? "#4f5257" : "#ef5350";
+  ENTRY = disguised ? "#8a8d92" : "#9aa3af";
+}
+setPalette();
 
 let slots = [], activeSlot = null, nextId = 1;
 let mode = null, pending = null, preview = null, selected = null, selectedInst = null, drag = null, pen = null;
@@ -865,7 +887,7 @@ function makeSlot(cfg, beforeEl) {
   const el = document.createElement("section");
   el.className = "slot";
   el.innerHTML =
-    `<div class="sh"><input class="sym" spellcheck="false" autocomplete="off" placeholder="종목 검색">` +
+    `<div class="sh"><input class="sym" spellcheck="false" autocomplete="off" placeholder="종목 검색"><span class="alias"></span>` +
     `<span class="px">-</span><span class="pc"></span><canvas class="spark"></canvas>` +
     `<span class="bell"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></span>` +
     `<select class="tf" title="봉 간격">${BARS.map(b => `<option value="${b}">${b}</option>`).join("")}</select>` +
@@ -902,7 +924,7 @@ function makeSlot(cfg, beforeEl) {
     crosshair: { mode: 0 }
   });
   S.candle = S.chart.addCandlestickSeries({
-    upColor: C("--up"), downColor: C("--down"), borderVisible: false, wickUpColor: C("--up"), wickDownColor: C("--down"),
+    ...candleOpts(),
     autoscaleInfoProvider: orig => {
       const o = orig(), f = S.rpFreeze;
       if (!f) return o;
@@ -1226,6 +1248,46 @@ function loadSlotConfig() {
 function updateTitle() {
   document.title = slots.map(S => S.inst || "새 칸").join(" · ") || "OKX Mini Chart";
 }
+
+function tintVols(vols, bars) {
+  const up = new Map(bars.map(b => [b.time, b.close >= b.open]));
+  return vols.map(v => ({ ...v, color: (up.get(v.time) === false ? C("--down") : C("--up")) + "80" }));
+}
+
+function applyIndColors(S) {
+  S.ma.forEach((s, k) => s.applyOptions({ color: maColor(k) }));
+  S.bbs.forEach(s => s.applyOptions({ color: bbColor() }));
+  S.rsi.applyOptions({ color: rsiColor() });
+  S.dcs.forEach(s => s.applyOptions({ color: dcColor() }));
+  updateMarkers(S);
+  if (!S.hover) showLbl(S);
+}
+
+function setDisguise(on) {
+  disguised = on;
+  store.set("okx.disguise", on ? "1" : "");
+  document.documentElement.classList.toggle("disguise", on);
+  setPalette();
+  for (const S of slots) {
+    S.chart.applyOptions({ layout: { textColor: C("--muted") } });
+    S.candle.applyOptions(candleOpts());
+    S.vols = tintVols(S.vols, S.bars);
+    S.vol.setData(S.vols);
+    if (S.rp) S.rp.vols = tintVols(S.rp.vols, S.rp.bars);
+    applyIndColors(S);
+    drawSpark(S);
+    if (S.rp) btRender(S);
+    const pct = parseFloat(S.pcEl.textContent);
+    if (Number.isFinite(pct)) S.pcEl.style.color = pct >= 0 ? C("--up") : C("--down");
+  }
+  syncDrawings();
+  tRepaint();
+  tRender();
+  post({ disguise: on });
+  return on;
+}
+
+function toggleDisguise() { return setDisguise(!disguised) }
 
 function growWindow(dy) {
   if (!dy) return;
@@ -2235,14 +2297,7 @@ function onColor(e) {
   else if (f === "dccolor") ind.dc.color = t.value;
   else return false;
   store.set("okx.ind", JSON.stringify(ind));
-  for (const S of slots) {
-    S.ma.forEach((s, k) => s.applyOptions({ color: maColor(k) }));
-    S.bbs.forEach(s => s.applyOptions({ color: bbColor() }));
-    S.rsi.applyOptions({ color: rsiColor() });
-    S.dcs.forEach(s => s.applyOptions({ color: dcColor() }));
-    updateMarkers(S);
-    if (!S.hover) showLbl(S);
-  }
+  for (const S of slots) applyIndColors(S);
   return true;
 }
 
@@ -4035,6 +4090,7 @@ syncTradeSubs();
 for (const inst of tWanted()) loadSpec(inst);
 setTrade(tr.on, false);
 setInterval(tRender, 500);
+post({ disguise: disguised });
 setInterval(() => { if (tr.dirty) saveAcct() }, 5000);
 setInterval(tFunding, 300000);
 setInterval(() => { refreshTicker(); if (topp.classList.contains("open")) renderTop() }, 10000);
