@@ -6,6 +6,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     private var window: NSWindow!
     private var webView: WKWebView!
     private var pinItem: NSMenuItem!
+    private var disguiseItem: NSMenuItem!
+    private var disguised = false
     private var titleObservation: NSKeyValueObservation?
     private let pinKey = "alwaysOnTop"
     private let opacityKey = "windowOpacity"
@@ -39,7 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         window.setFrameAutosaveName("MainWindow")
 
         titleObservation = webView.observe(\.title, options: [.new]) { [weak self] view, _ in
-            if let title = view.title, !title.isEmpty { self?.window.title = title }
+            if let title = view.title, !title.isEmpty, self?.disguised == false { self?.window.title = title }
         }
 
         if let url = Bundle.main.url(forResource: "index", withExtension: "html") {
@@ -65,6 +67,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         if let n = body["notify"] as? [String: Any] { notify(n); return }
         if body["notifyAuth"] as? Bool == true { requestNotifyAuth { _ in }; return }
         if let s = body["sound"] as? String { NSSound(named: NSSound.Name(s))?.play(); return }
+        if let d = body["disguise"] as? Bool { applyDisguise(d); return }
         let dx = body["dx"] as? Double ?? 0, dy = body["dy"] as? Double ?? 0
         guard dx.isFinite, dy.isFinite, dx != 0 || dy != 0 else { return }
         resizeWindow(dx: CGFloat(dx), dy: CGFloat(dy))
@@ -129,8 +132,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         if let s = n["sound"] as? String, !s.isEmpty { NSSound(named: NSSound.Name(s))?.play() }
         guard n["banner"] as? Bool ?? true else { return }
         let content = UNMutableNotificationContent()
-        content.title = n["title"] as? String ?? ""
-        content.body = n["body"] as? String ?? ""
+        content.title = disguised ? "알림" : n["title"] as? String ?? ""
+        content.body = disguised ? "" : n["body"] as? String ?? ""
         content.userInfo = ["inst": n["inst"] as? String ?? "", "tf": n["tf"] as? String ?? ""]
         requestNotifyAuth { granted in
             guard granted else { return }
@@ -184,6 +187,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         pinItem.state = on ? .on : .off
     }
 
+    @objc private func toggleDisguise() { webView.evaluateJavaScript("toggleDisguise()") }
+
+    private func applyDisguise(_ on: Bool) {
+        disguised = on
+        disguiseItem.state = on ? .on : .off
+        window.title = on ? "" : (webView.title.flatMap { $0.isEmpty ? nil : $0 } ?? "OKX Mini Chart")
+    }
+
     @objc private func sliderMoved(_ sender: NSSlider) { setOpacity(sender.doubleValue) }
     @objc private func moreTransparent() { setOpacity(window.alphaValue - 0.1) }
     @objc private func lessTransparent() { setOpacity(window.alphaValue + 0.1) }
@@ -235,6 +246,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         pinItem = NSMenuItem(title: "항상 위에 표시", action: #selector(togglePin), keyEquivalent: "t")
         pinItem.target = self
         view.addItem(pinItem)
+        disguiseItem = NSMenuItem(title: "위장 모드", action: #selector(toggleDisguise), keyEquivalent: "d")
+        disguiseItem.target = self
+        view.addItem(disguiseItem)
         let shotItem = NSMenuItem(title: "차트 캡처", action: #selector(capture), keyEquivalent: "s")
         shotItem.target = self
         view.addItem(shotItem)
