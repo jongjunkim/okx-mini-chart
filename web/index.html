@@ -894,7 +894,7 @@ function makeSlot(cfg, beforeEl) {
     `<button class="ic col" title="접기"></button><button class="ic cls" title="닫기">×</button><div class="sugg"></div></div>` +
     `<div class="rpb"><span class="rpt">리플레이</span><button data-rp="pick" title="다른 시작점 고르기">✂ 시작점</button>` +
     `<input type="datetime-local" class="rpd" title="이 시각부터 다시 시작">` +
-    `<button data-rp="play" class="rpp" title="재생·멈춤 (Space)">▶ 재생</button><button data-rp="step" title="한 봉 앞으로 (Shift+→)">한 봉 ▷</button>` +
+    `<button data-rp="back" title="한 봉 뒤로 (Shift+←)">◁ 한 봉</button><button data-rp="play" class="rpp" title="재생·멈춤 (Space)">▶ 재생</button><button data-rp="step" title="한 봉 앞으로 (Shift+→)">한 봉 ▷</button>` +
     `<select class="rps" title="재생 속도">${RP_SPEEDS.map(([v, t]) => `<option value="${v}">${t}</option>`).join("")}</select>` +
     `<span class="rpa"></span><button data-rp="end" title="실시간으로 돌아가기">끝내기</button></div>` +
     `<div class="btb"><span class="btt">백테스트</span>` +
@@ -1736,6 +1736,8 @@ function toInput(sec) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
+const RP_HIST_MAX = 5000;
+
 function rpTarget() {
   return activeSlot?.rp && slots.includes(activeSlot) ? activeSlot : slots.find(x => x.rp) || null;
 }
@@ -1878,6 +1880,10 @@ function rpStep(S) {
   }
   if (closeOf(S, b) > nowSec()) { rpPause(S); showToast("지금 봉까지 왔어요 · 끝내기를 누르면 실시간으로 돌아가요", false); return false }
   const ts = S.chart.timeScale(), range = ts.getVisibleLogicalRange();
+  // 한 봉 뒤로를 위해 이 봉을 붙이기 전 계좌를 떠 둔다
+  R.hist = R.hist || [];
+  R.hist.push({ n: i, bt: S.bt ? structuredClone(S.bt) : null });
+  if (R.hist.length > RP_HIST_MAX) R.hist.shift();
   R.T = closeOf(S, b);
   S.bars.push(b);
   S.vols.push(R.vols[i]);
@@ -1887,6 +1893,32 @@ function rpStep(S) {
   btOnBar(S, b);
   if (ind.dc.on) updateMarkers(S);
   if (range) ts.setVisibleLogicalRange(i > range.to - 2 ? { from: range.from + 1, to: range.to + 1 } : range);
+  rpStatus(S);
+  return true;
+}
+
+// 한 봉 뒤로: 마지막 봉을 떼고, 백테스트 중이면 그 봉을 붙이기 전 계좌로 되돌린다(그 봉에서 난 체결·청산도 취소).
+// 백테스트를 시작한 봉보다 앞으로는 못 간다. 되감은 횟수는 결과 창에 남긴다(본 미래로 다시 매매한 것이니까).
+function rpBack(S) {
+  const R = S.rp;
+  if (!R || !S.ready) return false;
+  if (S.bars.length <= 1) return false;
+  const h = R.hist?.at(-1), aligned = h && h.n === S.bars.length - 1;
+  if (S.bt) {
+    if (!aligned || !h.bt) { showToast("백테스트를 시작한 봉이에요 · 더 뒤로 가려면 초기화하세요", false); return false }
+    const rw = (S.bt.rewinds || 0) + 1;
+    S.bt = h.bt;
+    S.bt.rewinds = rw;
+  }
+  if (aligned) R.hist.pop(); else R.hist = [];
+  S.bars.pop();
+  S.vols.pop();
+  R.T = closeOf(S, S.bars.at(-1));
+  const ts = S.chart.timeScale(), range = ts.getVisibleLogicalRange();
+  S.candle.setData(S.bars);
+  S.vol.setData(S.vols);
+  paintInd(S, true);
+  if (range) ts.setVisibleLogicalRange(range);
   rpStatus(S);
   return true;
 }
@@ -1936,6 +1968,7 @@ function wireReplayBar(S) {
     if (a === "pick") setMode(mode === "P" ? null : "P");
     else if (a === "play") rpToggle(S);
     else if (a === "step") { rpPause(S); rpStep(S) }
+    else if (a === "back") { rpPause(S); rpBack(S) }
     else if (a === "end") loadSlot(S);
   });
   S.rpSpeedEl.addEventListener("change", () => {
@@ -1983,7 +2016,8 @@ function btStart(S) {
   btSeed = seed; btLev = lev;
   store.set("okx.bt.seed", String(seed));
   store.set("okx.bt.lev", String(lev));
-  S.bt = { seed, lev, cash: seed, pos: null, pend: null, trades: [], marks: [], peak: seed, mdd: 0, fees: 0, t0: S.rp.T, inst: S.inst };
+  S.bt = { seed, lev, cash: seed, pos: null, pend: null, trades: [], marks: [], peak: seed, mdd: 0, fees: 0, t0: S.rp.T, inst: S.inst, rewinds: 0 };
+  S.rp.hist = [];
   btRender(S);
   showToast(`${usd(seed)} USD · ${lev}x 로 시작해요 · ▶ 재생하면서 매수·매도를 누르세요`, false);
 }
@@ -2129,6 +2163,7 @@ function btSummary(S) {
     kv("수수료 합계", `${usd(B.fees + exitFee)} USD`) +
     `</div><div class="tw"><table><thead><tr><th>#</th><th>방향</th><th>진입</th><th>청산</th><th>보유</th><th class="r">손익 (증거금 대비)</th><th>사유</th></tr></thead>` +
     `<tbody>${rows.join("")}</tbody></table></div>` +
+    (B.rewinds ? `<div class="ft" style="color:${C("--down")}">한 봉 뒤로 ${B.rewinds}회 · 이미 본 봉을 되감아 다시 매매한 결과라 실전보다 좋게 나올 수 있어요</div>` : "") +
     `<div class="ft m">손익은 수수료를 뺀 값이에요 · 미청산은 마지막 종가로 닫았다고 보고 계산했어요 · ⌘S 로 이 창째 캡처할 수 있어요</div></div>`;
   $("btres").classList.add("open");
 }
@@ -2409,6 +2444,7 @@ document.addEventListener("keydown", e => {
   const R = rpTarget();
   if (R && !typing) {
     if (e.key === "ArrowRight" && e.shiftKey) { e.preventDefault(); rpPause(R); rpStep(R); return }
+    if (e.key === "ArrowLeft" && e.shiftKey) { e.preventDefault(); rpPause(R); rpBack(R); return }
     if (e.key === " ") { e.preventDefault(); document.activeElement?.blur?.(); rpToggle(R); return }
     const k = { b: 1, s: -1, x: 0 }[e.key.toLowerCase()];
     if (k !== undefined && R.bt && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); btOrder(R, k); return }
